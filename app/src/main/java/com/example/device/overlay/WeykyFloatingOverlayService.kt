@@ -24,6 +24,9 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.example.MainActivity
 import com.example.R
+import com.example.core.capabilities.CapabilityDetector
+import com.example.core.context.ContextSnapshot
+import com.example.core.context.ContextState
 import com.example.core.intent.ExecutionResult
 import com.example.core.intent.IntentExecutor
 import com.example.core.intent.IntentParser
@@ -44,7 +47,6 @@ import com.example.device.audio.AudioController
 import com.example.device.battery.BatteryProvider
 import com.example.device.calls.CallLogProvider
 import com.example.device.calls.ContactLookupProvider
-import com.example.device.calls.TelephonyCaller
 import com.example.device.flashlight.FlashlightController
 import com.example.device.launcher.LauncherRoleManager
 import com.example.device.media.MediaPlaybackController
@@ -58,6 +60,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -139,33 +143,30 @@ class WeykyFloatingOverlayService : Service() {
     val mediaPlaybackController = MediaPlaybackController(this)
     val appResolver = AppResolver(this)
     val contactLookup = ContactLookupProvider(this)
-    val telephonyCaller = TelephonyCaller(this)
     val locationProvider = LocationProvider(this)
     val weatherProvider = RealWeatherProvider(locationProvider)
     val networkProvider = NetworkProvider(this)
-    val telephonyProvider = TelephonyProvider(this)
     val callLogProvider = CallLogProvider(this)
+    val capabilityDetector = CapabilityDetector(this)
 
     val batteryActionHandler = BatteryActionHandler(batteryProvider)
     val storageMemoryActionHandler = StorageMemoryActionHandler(memoryProvider, storageProvider)
-    val flashlightActionHandler = FlashlightActionHandler(flashlightController)
+    val flashlightActionHandler = FlashlightActionHandler(capabilityDetector, flashlightController)
     val audioActionHandler = AudioActionHandler(audioController)
     val mediaActionHandler = MediaActionHandler(mediaPlaybackController)
     val appActionHandler = AppActionHandler(appResolver)
-    val callActionHandler = CallActionHandler(contactLookup, telephonyCaller, this)
+    val callActionHandler = CallActionHandler(this, callLogProvider, contactLookup)
     val weatherActionHandler = WeatherActionHandler(weatherProvider, locationProvider)
-    val networkActionHandler = NetworkActionHandler(networkProvider)
-    val notificationActionHandler = NotificationActionHandler()
+    val networkActionHandler = NetworkActionHandler(this, networkProvider)
+    val notificationActionHandler = NotificationActionHandler(this, capabilityDetector)
     val settingsActionHandler = SettingsActionHandler(this)
     val contextActionHandler = ContextActionHandler(
-      batteryProvider,
-      memoryProvider,
-      storageProvider,
-      networkProvider,
-      weatherProvider,
-      telephonyProvider,
-      callLogProvider,
-      audioController
+      getContextSnapshot = {
+        ContextSnapshot(
+          state = ContextState.STATIONARY,
+          confidence = 0.9f
+        )
+      }
     )
 
     intentExecutor = IntentExecutor(
@@ -459,12 +460,13 @@ class WeykyFloatingOverlayService : Service() {
       val executionResult = intentExecutor.execute(intent)
 
       val displayText = when (executionResult) {
-        is ExecutionResult.Success -> "✓ ${executionResult.message}"
-        is ExecutionResult.Failure -> "✗ ${executionResult.reason}"
-        is ExecutionResult.RequiresConfirmation -> "❓ ${executionResult.prompt}"
+        is ExecutionResult.Success -> "✓ ${executionResult.actionTaken ?: executionResult.speech}"
+        is ExecutionResult.Fallback -> "ℹ️ ${executionResult.explanation}"
         is ExecutionResult.RequiresPermission -> "⚠️ يتطلب صلاحية: ${executionResult.permission}"
-        is ExecutionResult.NeedsClarification -> "💬 ${executionResult.question}"
-        is ExecutionResult.PartiallyHandled -> "⚡ ${executionResult.message}"
+        is ExecutionResult.Error -> "✗ ${executionResult.friendlyMessage}"
+        is ExecutionResult.Unavailable -> "⚠️ ${executionResult.reason}"
+        is ExecutionResult.NeedsConfirmation -> "❓ ${executionResult.prompt}"
+        is ExecutionResult.NotSupported -> "🚫 ${executionResult.reason}"
       }
 
       resultView.text = displayText

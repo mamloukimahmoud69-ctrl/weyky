@@ -25,7 +25,8 @@ object WindowSizeResolver {
     posture: DevicePosture = DevicePosture.NORMAL,
     foldFeature: FoldFeatureInfo? = null,
     physicalScreenWidthDp: Dp? = null,
-    physicalScreenHeightDp: Dp? = null
+    physicalScreenHeightDp: Dp? = null,
+    windowOrientation: AdaptiveOrientation? = null
   ): DeviceProfile {
     // 1. Resolve standard Android Window Size Classes
     val widthClass = when {
@@ -40,23 +41,30 @@ object WindowSizeResolver {
       else -> WindowHeightSizeClass.EXPANDED
     }
 
-    // 2. Resolve orientation based on actual available window aspect ratio
-    val orientation = if (widthDp >= heightDp) {
-      AdaptiveOrientation.LANDSCAPE
-    } else {
-      AdaptiveOrientation.PORTRAIT
+    // 2. Resolve orientation:
+    // Respect the actual window/device orientation if provided (from Configuration),
+    // or fall back to physical screen aspect ratio before checking insets-adjusted height.
+    // This prevents soft keyboard appearances from falsely flipping a portrait phone into landscape!
+    val orientation = windowOrientation ?: run {
+      if (physicalScreenWidthDp != null && physicalScreenHeightDp != null) {
+        if (physicalScreenWidthDp >= physicalScreenHeightDp) AdaptiveOrientation.LANDSCAPE else AdaptiveOrientation.PORTRAIT
+      } else {
+        if (widthDp >= heightDp) AdaptiveOrientation.LANDSCAPE else AdaptiveOrientation.PORTRAIT
+      }
     }
 
     // 3. Multi-window / Split-screen detection
+    // True split-screen is when the application window width is partitioned (e.g. side-by-side)
+    // or when run in narrow vertical split (< 45% screen height in landscape).
+    // The soft keyboard appearing in a normal full-width portrait app must NEVER be flagged as split-screen!
     val isSplitScreen = run {
       if (physicalScreenWidthDp != null && physicalScreenHeightDp != null) {
         val widthFraction = widthDp / physicalScreenWidthDp
         val heightFraction = heightDp / physicalScreenHeightDp
-        widthFraction < 0.85f || heightFraction < 0.82f
+        widthFraction < 0.85f || (heightFraction < 0.45f && orientation == AdaptiveOrientation.LANDSCAPE)
       } else {
-        // Fallback heuristic: landscape with narrow width or portrait with severely constrained height
-        (orientation == AdaptiveOrientation.LANDSCAPE && widthDp < 540.dp) ||
-          (orientation == AdaptiveOrientation.PORTRAIT && heightDp < 460.dp)
+        // Fallback heuristic: landscape with narrow width
+        (orientation == AdaptiveOrientation.LANDSCAPE && widthDp < 540.dp)
       }
     }
 
@@ -72,7 +80,7 @@ object WindowSizeResolver {
       posture == DevicePosture.BOOK && widthDp >= 580.dp -> AdaptiveLayoutMode.FOLDABLE_BOOK
       isCompactLandscape -> AdaptiveLayoutMode.PHONE_LANDSCAPE
       isTablet || widthClass == WindowWidthSizeClass.EXPANDED -> AdaptiveLayoutMode.TABLET_EXPANDED
-      isSplitScreen && (widthDp < 420.dp || heightDp < 460.dp) -> AdaptiveLayoutMode.SPLIT_SCREEN_COMPACT
+      isSplitScreen && widthDp < 420.dp -> AdaptiveLayoutMode.SPLIT_SCREEN_COMPACT
       else -> AdaptiveLayoutMode.PHONE_PORTRAIT
     }
 
@@ -86,7 +94,7 @@ object WindowSizeResolver {
     val maxCardWidth = when (layoutMode) {
       AdaptiveLayoutMode.PHONE_PORTRAIT -> minOf(widthDp - 20.dp, 600.dp)
       AdaptiveLayoutMode.PHONE_LANDSCAPE -> minOf(widthDp * 0.54f, 540.dp)
-      AdaptiveLayoutMode.TABLET_EXPANDED -> minOf(widthDp * 0.48f, 580.dp)
+      AdaptiveLayoutMode.TABLET_EXPANDED -> minOf(widthDp - 48.dp, 760.dp)
       AdaptiveLayoutMode.FOLDABLE_BOOK -> minOf((widthDp / 2f) - 16.dp, 500.dp)
       AdaptiveLayoutMode.FOLDABLE_TABLETOP -> minOf(widthDp - 24.dp, 640.dp)
       AdaptiveLayoutMode.SPLIT_SCREEN_COMPACT -> widthDp - 12.dp
@@ -145,6 +153,12 @@ fun rememberAdaptiveLayoutState(
   val layoutDirection = LocalLayoutDirection.current
   val isRtl = layoutDirection == LayoutDirection.Rtl
 
+  val configOrientation = if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+    AdaptiveOrientation.LANDSCAPE
+  } else {
+    AdaptiveOrientation.PORTRAIT
+  }
+
   // Determine available dimensions (passed container or window configuration)
   val widthDp = containerWidthDp ?: configuration.screenWidthDp.dp
   val heightDp = containerHeightDp ?: configuration.screenHeightDp.dp
@@ -158,14 +172,15 @@ fun rememberAdaptiveLayoutState(
     detectSafePosture(configuration, widthDp, heightDp)
   }
 
-  return remember(widthDp, heightDp, isRtl, posture) {
+  return remember(widthDp, heightDp, isRtl, posture, configOrientation) {
     WindowSizeResolver.resolve(
       widthDp = widthDp,
       heightDp = heightDp,
       isRtl = isRtl,
       posture = posture,
       physicalScreenWidthDp = physicalWidthDp,
-      physicalScreenHeightDp = physicalHeightDp
+      physicalScreenHeightDp = physicalHeightDp,
+      windowOrientation = configOrientation
     )
   }
 }

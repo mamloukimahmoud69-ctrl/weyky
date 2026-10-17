@@ -86,6 +86,25 @@ class AdaptiveLayoutStateTest {
   }
 
   @Test
+  fun `portrait tablet window resolves to tablet mode with centered core sizing`() {
+    val profile = WindowSizeResolver.resolve(
+      widthDp = 768.dp,
+      heightDp = 1024.dp,
+      isRtl = false
+    )
+
+    assertEquals(WindowWidthSizeClass.MEDIUM, profile.widthSizeClass)
+    assertEquals(WindowHeightSizeClass.EXPANDED, profile.heightSizeClass)
+    assertEquals(AdaptiveOrientation.PORTRAIT, profile.orientation)
+    assertTrue("Should be classified as tablet", profile.isTablet)
+    assertEquals(AdaptiveLayoutMode.TABLET_EXPANDED, profile.layoutMode)
+
+    val coreSize = profile.calculateAdaptiveCoreSize(0.44f)
+    assertTrue("Portrait tablet core should have generous centered scale", coreSize >= 160.dp)
+    assertTrue("Portrait tablet core should not exceed width", coreSize <= 768.dp)
+  }
+
+  @Test
   fun `wide but short landscape window prevents clipping`() {
     val profile = WindowSizeResolver.resolve(
       widthDp = 960.dp,
@@ -184,5 +203,25 @@ class AdaptiveLayoutStateTest {
     assertEquals(DevicePosture.NORMAL, normalProfile.posture)
     assertNotNull(normalProfile.layoutMode)
     assertTrue(normalProfile.calculateAdaptiveCoreSize(0.44f) > 0.dp)
+  }
+
+  @Test
+  fun `phone portrait with keyboard open maintains phone portrait layout mode and does not flip to landscape or split screen`() {
+    val profile = WindowSizeResolver.resolve(
+      widthDp = 412.dp,
+      heightDp = 360.dp,
+      isRtl = false,
+      physicalScreenWidthDp = 412.dp,
+      physicalScreenHeightDp = 892.dp,
+      windowOrientation = AdaptiveOrientation.PORTRAIT
+    )
+
+    assertEquals(AdaptiveOrientation.PORTRAIT, profile.orientation)
+    assertFalse("Keyboard opening should not be flagged as split-screen", profile.isSplitScreen)
+    assertFalse("Portrait phone with keyboard open should not be classified as compact landscape", profile.isCompactLandscape)
+    assertEquals("Should preserve PHONE_PORTRAIT layout when keyboard opens", AdaptiveLayoutMode.PHONE_PORTRAIT, profile.layoutMode)
+
+    val coreSize = profile.calculateAdaptiveCoreSize(0.44f)
+    assertTrue("Core size should be positive and adapt to reduced height", coreSize > 0.dp)
   }
 }

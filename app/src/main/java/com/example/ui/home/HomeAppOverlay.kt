@@ -1,5 +1,10 @@
 package com.example.ui.home
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.util.LruCache
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,15 +15,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -27,25 +32,68 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
 import com.example.device.apps.AppMatch
 import com.example.ui.adaptive.DeviceProfile
 import com.example.ui.theme.JarvisHudBadge
-import com.example.ui.theme.JarvisHudCard
 import com.example.ui.theme.JarvisHudColors
 import com.example.ui.theme.jarvisTacticalBackground
 
+/**
+ * High-performance, in-memory LRU icon cache for installed Android applications.
+ * Prevents repetitive PackageManager queries and icon re-decoding during LazyVerticalGrid scrolling.
+ */
+object AppIconCache {
+  private val iconCache = LruCache<String, ImageBitmap>(160)
+
+  fun getIcon(context: Context, packageName: String): ImageBitmap? {
+    iconCache.get(packageName)?.let { return it }
+    return try {
+      val pm = context.packageManager
+      val drawable = pm.getApplicationIcon(packageName)
+      val density = context.resources.displayMetrics.density
+      val targetSizePx = (48 * density).toInt().coerceAtLeast(48)
+      val bitmap = drawable.toBitmap(
+        width = targetSizePx,
+        height = targetSizePx,
+        config = Bitmap.Config.ARGB_8888
+      )
+      val imageBitmap = bitmap.asImageBitmap()
+      iconCache.put(packageName, imageBitmap)
+      imageBitmap
+    } catch (_: Exception) {
+      null
+    }
+  }
+}
+
+/**
+ * Native Android App Drawer Screen for WEYKY.
+ * Replaces tall vertical cards with an adaptive, native launcher-style application icon grid:
+ * - Real installed launcher icon with in-memory caching.
+ * - Application name cleanly centered beneath the icon.
+ * - Adaptive grid columns (4-5 on phones, 6-10 on tablets/foldables) via GridCells.Adaptive.
+ * - Full search and filtering preserved.
+ * - Generous, accessible touch targets (>= 48dp) with debounce protection.
+ */
 @Composable
 fun AppSurfaceOverlay(
   apps: List<AppMatch>,
@@ -74,18 +122,21 @@ fun AppSurfaceOverlay(
     }
   }
 
-  // Adaptive grid columns based on window width
-  val gridColumns = when {
-    deviceProfile.windowWidthDp >= 900.dp -> 3
-    deviceProfile.windowWidthDp >= 600.dp -> 2
-    else -> 1
+  // Double-tap prevention timestamp
+  var lastLaunchTimeMs by remember { mutableLongStateOf(0L) }
+  val safeLaunchApp: (AppMatch) -> Unit = { app ->
+    val now = System.currentTimeMillis()
+    if (now - lastLaunchTimeMs > 500L) {
+      lastLaunchTimeMs = now
+      onLaunchApp(app)
+    }
   }
 
   Surface(
     modifier = modifier
       .fillMaxSize()
       .testTag("app_surface_overlay"),
-    color = backgroundColor.copy(alpha = 0.97f)
+    color = backgroundColor.copy(alpha = 0.98f)
   ) {
     Column(
       modifier = Modifier
@@ -172,85 +223,143 @@ fun AppSurfaceOverlay(
           .testTag("app_search_field")
       )
 
-      Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(14.dp))
 
-      // Adaptive Multi-Column Apps Grid
-      LazyVerticalGrid(
-        columns = GridCells.Fixed(gridColumns),
-        modifier = Modifier
-          .fillMaxWidth()
-          .weight(1f)
-          .testTag("apps_list"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-      ) {
-        items(filteredApps, key = { it.packageName }) { app ->
-          JarvisHudCard(
-            accentColor = borderColor,
-            containerColor = panelBg,
-            cutCornerSize = 12.dp,
-            onClick = { onLaunchApp(app) },
-            modifier = Modifier
-              .fillMaxWidth()
-              .testTag("app_item_${app.packageName}")
+      // Native Launcher-Style Responsive App Grid
+      if (filteredApps.isEmpty()) {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f),
+          contentAlignment = Alignment.Center
+        ) {
+          Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
           ) {
-            Row(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-              ) {
-                JarvisHudBadge(
-                  accentColor = borderColor,
-                  containerColor = panelBgElevated,
-                  cutSize = 6.dp,
-                  modifier = Modifier.size(38.dp)
-                ) {
-                  Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                      text = app.label.firstOrNull()?.uppercase() ?: "?",
-                      fontSize = 15.sp,
-                      fontFamily = FontFamily.Monospace,
-                      fontWeight = FontWeight.Bold,
-                      color = borderColor
-                    )
-                  }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                  Text(
-                    text = app.label,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                  )
-                  Text(
-                    text = app.packageName,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                  )
-                }
-              }
-              Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                tint = borderColor,
-                modifier = Modifier.size(18.dp)
-              )
-            }
+            Icon(
+              imageVector = Icons.Default.SearchOff,
+              contentDescription = null,
+              tint = borderColor.copy(alpha = 0.6f),
+              modifier = Modifier.size(40.dp)
+            )
+            Text(
+              text = if (searchQuery.isNotBlank()) "لا توجد نتائج تطابق \"$searchQuery\"" else "لا توجد تطبيقات مثبتة",
+              fontSize = 14.sp,
+              color = textSecondary,
+              textAlign = TextAlign.Center
+            )
+            Text(
+              text = "NO MATCHING APPLICATIONS",
+              fontSize = 11.sp,
+              fontFamily = FontFamily.Monospace,
+              color = borderColor.copy(alpha = 0.7f),
+              letterSpacing = 1.sp
+            )
+          }
+        }
+      } else {
+        LazyVerticalGrid(
+          columns = GridCells.Adaptive(minSize = 74.dp),
+          modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f)
+            .testTag("apps_list"),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          items(filteredApps, key = { it.packageName }) { app ->
+            AppGridIconItem(
+              app = app,
+              borderColor = borderColor,
+              textPrimary = textPrimary,
+              onClick = { safeLaunchApp(app) }
+            )
           }
         }
       }
     }
+  }
+}
+
+/**
+ * Standard launcher icon grid item:
+ * - App icon at 48dp x 48dp with subtle rounded corners.
+ * - App label beneath the icon, centered, max 2 lines with clean ellipsis.
+ * - Accessible touch target of at least 48dp.
+ */
+@Composable
+private fun AppGridIconItem(
+  app: AppMatch,
+  borderColor: Color,
+  textPrimary: Color,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier
+) {
+  val context = LocalContext.current
+  val iconBitmap = remember(app.packageName) {
+    AppIconCache.getIcon(context, app.packageName)
+  }
+
+  Column(
+    modifier = modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(12.dp))
+      .clickable(onClick = onClick)
+      .padding(horizontal = 4.dp, vertical = 6.dp)
+      .testTag("app_item_${app.packageName}"),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Top
+  ) {
+    // Launcher Icon
+    Box(
+      modifier = Modifier
+        .size(52.dp),
+      contentAlignment = Alignment.Center
+    ) {
+      if (iconBitmap != null) {
+        Image(
+          bitmap = iconBitmap,
+          contentDescription = app.label,
+          modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(10.dp))
+        )
+      } else {
+        // Fallback for Robolectric unit tests or apps without package icon
+        JarvisHudBadge(
+          accentColor = borderColor,
+          containerColor = borderColor.copy(alpha = 0.14f),
+          cutSize = 8.dp,
+          modifier = Modifier.size(48.dp)
+        ) {
+          Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+              text = app.label.firstOrNull()?.uppercase() ?: "?",
+              fontSize = 18.sp,
+              fontFamily = FontFamily.Monospace,
+              fontWeight = FontWeight.Bold,
+              color = borderColor
+            )
+          }
+        }
+      }
+    }
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // App Name directly beneath icon
+    Text(
+      text = app.label,
+      fontSize = 11.5.sp,
+      fontWeight = FontWeight.Normal,
+      color = textPrimary,
+      textAlign = TextAlign.Center,
+      maxLines = 2,
+      minLines = 1,
+      lineHeight = 14.sp,
+      overflow = TextOverflow.Ellipsis,
+      modifier = Modifier.fillMaxWidth()
+    )
   }
 }

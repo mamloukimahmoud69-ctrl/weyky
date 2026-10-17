@@ -113,8 +113,12 @@ data class DeviceProfile(
       }
       AdaptiveLayoutMode.TABLET_EXPANDED,
       AdaptiveLayoutMode.FOLDABLE_BOOK -> {
-        // In tablet or book mode, there is ample space in both dimensions.
-        val paneDimension = minOf(windowWidthDp * 0.45f, windowHeightDp * 0.65f)
+        // In tablet mode, calculate based on orientation so portrait tablets can use their centered workspace
+        val paneDimension = if (orientation == AdaptiveOrientation.PORTRAIT) {
+          minOf(windowWidthDp * 0.55f, windowHeightDp * 0.45f)
+        } else {
+          minOf(windowWidthDp * 0.45f, windowHeightDp * 0.65f)
+        }
         (paneDimension * scale * 1.5f).coerceIn(160.dp, 380.dp)
       }
       AdaptiveLayoutMode.FOLDABLE_TABLETOP -> {

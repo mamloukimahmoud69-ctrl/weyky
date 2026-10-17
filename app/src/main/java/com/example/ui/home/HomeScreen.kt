@@ -27,8 +27,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.core.state.WeykyUiState
 import com.example.device.apps.AppMatch
+import com.example.device.battery.ChargingState
 import com.example.ui.adaptive.AdaptiveLayoutMode
+import com.example.ui.adaptive.AdaptiveOrientation
 import com.example.ui.adaptive.CardDensity
+import com.example.ui.adaptive.DevicePosture
 import com.example.ui.adaptive.DeviceProfile
 import com.example.ui.adaptive.rememberAdaptiveLayoutState
 import com.example.ui.theme.JarvisHudColors
@@ -464,8 +467,15 @@ private fun PhoneLandscapeHomeScreen(
 /**
  * Tablet & Expanded Window Composition.
  * Dual-pane tactical dashboard:
- * - Left Pane: System Action Bar, Full-fidelity Visual Core, and Response / Command Bar.
- * - Right Pane: Expanded Telemetry, Music Player, Events, and Intelligence Hub.
+ * Tablet & Expanded Window Composition.
+ * Corrected per the Targeted Tablet Home Layout Optimization specification:
+ * - Efficient window utilization without excessive unused space or fake placeholders.
+ * - Prominent, beautifully centered Core Workspace calculated from measured bounds.
+ * - Single balanced Top Information Row for Date and Weather, eliminating duplicate telemetry.
+ * - Responsive dual-region arrangement on wide landscape windows when contextual content is active.
+ * - Quiet, uncluttered, centered composition when no contextual stream is active.
+ * - Perfectly centered single-column composition on portrait tablets preventing awkward multi-column cramping.
+ * - Fully preserves existing bottom interaction bar (Settings, Input, Apps) with generous touch targets.
  */
 @Composable
 private fun TabletExpandedHomeScreen(
@@ -491,63 +501,223 @@ private fun TabletExpandedHomeScreen(
   keyboardController: androidx.compose.ui.platform.SoftwareKeyboardController?
 ) {
   val dynamicCoreSize = deviceProfile.calculateAdaptiveCoreSize(uiState.coreScale)
+  val isLandscape = deviceProfile.orientation == AdaptiveOrientation.LANDSCAPE &&
+    deviceProfile.windowWidthDp >= 840.dp
+  val isBookPosture = deviceProfile.posture == DevicePosture.BOOK
 
-  Row(
-    modifier = Modifier
-      .fillMaxSize()
-      .padding(
-        horizontal = deviceProfile.contentPaddingHorizontalDp,
-        vertical = deviceProfile.contentPaddingVerticalDp
-      ),
-    horizontalArrangement = Arrangement.spacedBy(20.dp)
-  ) {
-    // LEFT PANE: Core Interaction & Direct Input
-    Column(
-      modifier = Modifier
-        .weight(1f)
-        .fillMaxHeight(),
-      verticalArrangement = Arrangement.SpaceBetween,
-      horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-      HomeTopRowCards(
-        uiState = uiState,
-        borderColor = borderColor,
-        panelBg = panelBg,
-        textPrimary = textPrimary,
-        textSecondary = textSecondary,
-        textMuted = textMuted,
-        density = deviceProfile.cardDensity,
-        onQuerySubmit = onQuerySubmit
-      )
+  val isMusicActivelyPlaying = uiState.isMusicPlaying || (uiState.activeMediaMetadata?.isPlaying == true)
+  val hasResponse = !uiState.lastResponseText.isNullOrBlank()
+  val battery = uiState.batterySnapshot
+  val isLowBattery = battery != null && battery.isAvailable && battery.percentage <= 20 &&
+    battery.chargingState != ChargingState.CHARGING &&
+    battery.chargingState != ChargingState.FULL
+  val isBatteryFull = battery != null && battery.isAvailable && battery.percentage == 100 &&
+    battery.chargingState == ChargingState.FULL
+  val hasMissedCall = (uiState.missedCallsSummary?.missedCallsCount ?: 0) > 0
+  val hasUrgentNotif = (uiState.notificationSummary?.totalImportantCount ?: 0) > 0
+  val hasFallbackEvent = uiState.importantEvents.isNotEmpty()
+  val hasAlert = isLowBattery || isBatteryFull || hasMissedCall || hasUrgentNotif || hasFallbackEvent
 
-      Box(
+  val hasActiveContextualContent = isMusicActivelyPlaying || hasResponse || hasAlert
+
+  when {
+    // 1. Foldable Book Posture: Two physical screen halves split by the vertical hinge
+    isBookPosture -> {
+      Row(
         modifier = Modifier
-          .weight(1f)
-          .fillMaxWidth(),
-        contentAlignment = Alignment.Center
+          .fillMaxSize()
+          .padding(
+            horizontal = deviceProfile.contentPaddingHorizontalDp,
+            vertical = deviceProfile.contentPaddingVerticalDp
+          ),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
       ) {
-        HomeCoreSection(
-          uiState = uiState,
-          coreSizeDp = dynamicCoreSize,
-          onToggleVoice = onToggleVoice
-        )
-      }
+        // Left screen half: Top Row + Living Core
+        Column(
+          modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight(),
+          verticalArrangement = Arrangement.SpaceBetween,
+          horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+          HomeTopRowCards(
+            uiState = uiState,
+            borderColor = borderColor,
+            panelBg = panelBg,
+            textPrimary = textPrimary,
+            textSecondary = textSecondary,
+            textMuted = textMuted,
+            density = CardDensity.COMPACT,
+            onQuerySubmit = onQuerySubmit
+          )
 
+          Box(
+            modifier = Modifier
+              .weight(1f)
+              .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+          ) {
+            HomeCoreSection(
+              uiState = uiState,
+              coreSizeDp = dynamicCoreSize,
+              onToggleVoice = onToggleVoice
+            )
+          }
+        }
+
+        // Right screen half: Contextual Stream + Response + Controls
+        Column(
+          modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight(),
+          verticalArrangement = Arrangement.SpaceBetween,
+          horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+          Column(
+            modifier = Modifier
+              .weight(1f)
+              .fillMaxWidth()
+              .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+          ) {
+            HomeMusicCard(
+              uiState = uiState,
+              borderColor = borderColor,
+              panelBgElevated = panelBgElevated,
+              textPrimary = textPrimary,
+              textSecondary = textSecondary,
+              onToggleMediaPlayback = onToggleMediaPlayback,
+              onNextMediaTrack = onNextMediaTrack,
+              onPreviousMediaTrack = onPreviousMediaTrack
+            )
+
+            HomeContextAlertCard(
+              uiState = uiState,
+              borderColor = borderColor,
+              onQuerySubmit = onQuerySubmit
+            )
+
+            HomeResponseCard(
+              uiState = uiState,
+              borderColor = borderColor,
+              panelBg = panelBg,
+              panelBgElevated = panelBgElevated,
+              textPrimary = textPrimary,
+              onQuerySubmit = onQuerySubmit,
+              onConfirmOption = onConfirmOption,
+              onRequestPermission = onRequestPermission
+            )
+          }
+
+          HomeBottomControlRow(
+            uiState = uiState,
+            borderColor = borderColor,
+            panelBg = panelBg,
+            panelBgElevated = panelBgElevated,
+            textPrimary = textPrimary,
+            textSecondary = textSecondary,
+            isLight = isLight,
+            onQueryChange = onQueryChange,
+            onQuerySubmit = onQuerySubmit,
+            onToggleVoice = onToggleVoice,
+            onOpenSettings = onOpenSettings,
+            onToggleAppDrawer = onToggleAppDrawer,
+            keyboardController = keyboardController
+          )
+        }
+      }
+    }
+
+    // 2. Wide Landscape Tablet with active contextual content: Balanced dual-region composition
+    isLandscape && hasActiveContextualContent -> {
       Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(
+            horizontal = deviceProfile.contentPaddingHorizontalDp,
+            vertical = deviceProfile.contentPaddingVerticalDp
+          ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
       ) {
-        HomeResponseCard(
+        // Top information row: Weather + Date, centered with balanced width
+        HomeTopRowCards(
           uiState = uiState,
           borderColor = borderColor,
           panelBg = panelBg,
-          panelBgElevated = panelBgElevated,
           textPrimary = textPrimary,
+          textSecondary = textSecondary,
+          textMuted = textMuted,
+          density = deviceProfile.cardDensity,
           onQuerySubmit = onQuerySubmit,
-          onConfirmOption = onConfirmOption,
-          onRequestPermission = onRequestPermission
+          modifier = Modifier.widthIn(max = 760.dp)
         )
 
+        // Middle workspace: Core on the main side, contextual cards on the auxiliary side
+        Row(
+          modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .widthIn(max = 1100.dp)
+            .padding(vertical = 8.dp),
+          horizontalArrangement = Arrangement.spacedBy(24.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          // Living Core Workspace (Hero)
+          Box(
+            modifier = Modifier
+              .weight(1.25f)
+              .fillMaxHeight(),
+            contentAlignment = Alignment.Center
+          ) {
+            HomeCoreSection(
+              uiState = uiState,
+              coreSizeDp = dynamicCoreSize,
+              onToggleVoice = onToggleVoice
+            )
+          }
+
+          // Contextual Activity Stream (Response, Music, Alerts)
+          Column(
+            modifier = Modifier
+              .weight(0.95f)
+              .fillMaxHeight()
+              .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+          ) {
+            HomeResponseCard(
+              uiState = uiState,
+              borderColor = borderColor,
+              panelBg = panelBg,
+              panelBgElevated = panelBgElevated,
+              textPrimary = textPrimary,
+              onQuerySubmit = onQuerySubmit,
+              onConfirmOption = onConfirmOption,
+              onRequestPermission = onRequestPermission
+            )
+
+            HomeMusicCard(
+              uiState = uiState,
+              borderColor = borderColor,
+              panelBgElevated = panelBgElevated,
+              textPrimary = textPrimary,
+              textSecondary = textSecondary,
+              onToggleMediaPlayback = onToggleMediaPlayback,
+              onNextMediaTrack = onNextMediaTrack,
+              onPreviousMediaTrack = onPreviousMediaTrack
+            )
+
+            HomeContextAlertCard(
+              uiState = uiState,
+              borderColor = borderColor,
+              onQuerySubmit = onQuerySubmit
+            )
+          }
+        }
+
+        // Bottom interaction row: Settings, Input, and App Drawer
         HomeBottomControlRow(
           uiState = uiState,
           borderColor = borderColor,
@@ -561,46 +731,172 @@ private fun TabletExpandedHomeScreen(
           onToggleVoice = onToggleVoice,
           onOpenSettings = onOpenSettings,
           onToggleAppDrawer = onToggleAppDrawer,
-          keyboardController = keyboardController
+          keyboardController = keyboardController,
+          modifier = Modifier.widthIn(max = 760.dp)
         )
       }
     }
 
-    // RIGHT PANE: Telemetry & Activity Stream
-    Column(
-      modifier = Modifier
-        .weight(1.05f)
-        .fillMaxHeight()
-        .verticalScroll(rememberScrollState()),
-      verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-      HomeTelemetryCard(
-        uiState = uiState,
-        borderColor = borderColor,
-        panelBg = panelBg,
-        textPrimary = textPrimary,
-        textSecondary = textSecondary,
-        textMuted = textMuted,
-        density = CardDensity.EXPANDED,
-        onQuerySubmit = onQuerySubmit
-      )
+    // 3. Wide Landscape Tablet without active contextual content: Quiet, grand, centered composition
+    isLandscape -> {
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(
+            horizontal = deviceProfile.contentPaddingHorizontalDp,
+            vertical = deviceProfile.contentPaddingVerticalDp
+          ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+      ) {
+        // Top information row: Centered with balanced width
+        HomeTopRowCards(
+          uiState = uiState,
+          borderColor = borderColor,
+          panelBg = panelBg,
+          textPrimary = textPrimary,
+          textSecondary = textSecondary,
+          textMuted = textMuted,
+          density = deviceProfile.cardDensity,
+          onQuerySubmit = onQuerySubmit,
+          modifier = Modifier.widthIn(max = 680.dp)
+        )
 
-      HomeMusicCard(
-        uiState = uiState,
-        borderColor = borderColor,
-        panelBgElevated = panelBgElevated,
-        textPrimary = textPrimary,
-        textSecondary = textSecondary,
-        onToggleMediaPlayback = onToggleMediaPlayback,
-        onNextMediaTrack = onNextMediaTrack,
-        onPreviousMediaTrack = onPreviousMediaTrack
-      )
+        // Center workspace: Core is the pure focal hero with generous breathing room
+        Box(
+          modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+          contentAlignment = Alignment.Center
+        ) {
+          HomeCoreSection(
+            uiState = uiState,
+            coreSizeDp = dynamicCoreSize,
+            onToggleVoice = onToggleVoice
+          )
+        }
 
-      HomeContextAlertCard(
-        uiState = uiState,
-        borderColor = borderColor,
-        onQuerySubmit = onQuerySubmit
-      )
+        // Bottom interaction row: Centered with balanced width
+        HomeBottomControlRow(
+          uiState = uiState,
+          borderColor = borderColor,
+          panelBg = panelBg,
+          panelBgElevated = panelBgElevated,
+          textPrimary = textPrimary,
+          textSecondary = textSecondary,
+          isLight = isLight,
+          onQueryChange = onQueryChange,
+          onQuerySubmit = onQuerySubmit,
+          onToggleVoice = onToggleVoice,
+          onOpenSettings = onOpenSettings,
+          onToggleAppDrawer = onToggleAppDrawer,
+          keyboardController = keyboardController,
+          modifier = Modifier.widthIn(max = 760.dp)
+        )
+      }
+    }
+
+    // 4. Portrait Tablet: Single-column centered vertical composition with optimal proportions
+    else -> {
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(
+            horizontal = deviceProfile.contentPaddingHorizontalDp,
+            vertical = deviceProfile.contentPaddingVerticalDp
+          ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+      ) {
+        // Top Section: Date + Weather, plus any active Music/Alerts
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 680.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          HomeTopRowCards(
+            uiState = uiState,
+            borderColor = borderColor,
+            panelBg = panelBg,
+            textPrimary = textPrimary,
+            textSecondary = textSecondary,
+            textMuted = textMuted,
+            density = deviceProfile.cardDensity,
+            onQuerySubmit = onQuerySubmit
+          )
+
+          HomeMusicCard(
+            uiState = uiState,
+            borderColor = borderColor,
+            panelBgElevated = panelBgElevated,
+            textPrimary = textPrimary,
+            textSecondary = textSecondary,
+            onToggleMediaPlayback = onToggleMediaPlayback,
+            onNextMediaTrack = onNextMediaTrack,
+            onPreviousMediaTrack = onPreviousMediaTrack
+          )
+
+          HomeContextAlertCard(
+            uiState = uiState,
+            borderColor = borderColor,
+            onQuerySubmit = onQuerySubmit
+          )
+        }
+
+        // Center Workspace: Prominent, perfectly centered Core
+        Box(
+          modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+          contentAlignment = Alignment.Center
+        ) {
+          HomeCoreSection(
+            uiState = uiState,
+            coreSizeDp = dynamicCoreSize,
+            onToggleVoice = onToggleVoice
+          )
+        }
+
+        // Bottom Section: Response (if active) + Bottom Control Row
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 720.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+          HomeResponseCard(
+            uiState = uiState,
+            borderColor = borderColor,
+            panelBg = panelBg,
+            panelBgElevated = panelBgElevated,
+            textPrimary = textPrimary,
+            onQuerySubmit = onQuerySubmit,
+            onConfirmOption = onConfirmOption,
+            onRequestPermission = onRequestPermission
+          )
+
+          HomeBottomControlRow(
+            uiState = uiState,
+            borderColor = borderColor,
+            panelBg = panelBg,
+            panelBgElevated = panelBgElevated,
+            textPrimary = textPrimary,
+            textSecondary = textSecondary,
+            isLight = isLight,
+            onQueryChange = onQueryChange,
+            onQuerySubmit = onQuerySubmit,
+            onToggleVoice = onToggleVoice,
+            onOpenSettings = onOpenSettings,
+            onToggleAppDrawer = onToggleAppDrawer,
+            keyboardController = keyboardController
+          )
+        }
+      }
     }
   }
 }

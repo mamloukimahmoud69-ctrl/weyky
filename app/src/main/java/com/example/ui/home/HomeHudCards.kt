@@ -11,9 +11,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -196,7 +198,7 @@ fun HomeWeatherCard(
   onQuerySubmit: (String) -> Unit,
   modifier: Modifier = Modifier
 ) {
-  val isCompact = density == CardDensity.COMPACT || density == CardDensity.ULTRA_COMPACT
+  val isCompact = density == CardDensity.COMPACT
   val weather = uiState.weatherSnapshot
   val tempVal = weather?.temperatureCelsius
   val tempText = if (weather != null && weather.isAvailable && tempVal != null) {
@@ -307,7 +309,7 @@ fun HomeDateCard(
   onQuerySubmit: (String) -> Unit,
   modifier: Modifier = Modifier
 ) {
-  val isCompact = density == CardDensity.COMPACT || density == CardDensity.ULTRA_COMPACT
+  val isCompact = density == CardDensity.COMPACT
   val primaryDate = uiState.currentDateString.ifBlank { "الجمعة، 16 أكتوبر" }
   val englishDate = uiState.currentEnglishDateString.ifBlank { "Friday, 16 Oct" }
 
@@ -952,13 +954,24 @@ fun HomeCoreSection(
     100
   }
 
-  Box(
+  BoxWithConstraints(
     modifier = modifier,
     contentAlignment = Alignment.Center
   ) {
+    // True adaptive core sizing:
+    // When normal space is available, uses full coreSizeDp.
+    // When keyboard appears or available height decreases, the core gracefully adapts
+    // down to fit the measured parent container without pushing controls off-screen!
+    val maxAvailableDim = minOf(maxWidth, maxHeight)
+    val adaptiveSize = if (maxAvailableDim > 0.dp && maxAvailableDim < coreSizeDp) {
+      maxAvailableDim * 0.94f
+    } else {
+      coreSizeDp
+    }
+
     WeykyCoreView(
       visualState = uiState.visualState,
-      sizeDp = coreSizeDp,
+      sizeDp = adaptiveSize.coerceAtLeast(48.dp),
       isPowerSaving = uiState.isPowerSaving,
       isVoiceListening = uiState.isVoiceListening,
       isSpeakingAloud = uiState.isSpeakingAloud,
