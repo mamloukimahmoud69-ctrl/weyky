@@ -103,6 +103,13 @@ class IntentExecutor(
         }
         contextActionHandler.handleHypotheticalScheduleDelay(intent.delayMinutes)
       }
+      is WeykyIntent.TimeAwareBatteryForecastIntent -> {
+        localConversationalEngine?.session?.let {
+          it.currentTopic = "battery"
+          it.lastReferencedSubject = "battery"
+        }
+        contextActionHandler.handleTimeAwareBatteryForecast(intent, localConversationalEngine?.session)
+      }
 
       is WeykyIntent.WifiIntent -> networkActionHandler.handleWifi(intent.openSettings)
       is WeykyIntent.BluetoothIntent -> networkActionHandler.handleBluetooth()
