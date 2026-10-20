@@ -95,6 +95,18 @@ sealed interface WeykyIntent {
   object HypotheticalBatteryMusicIntent : WeykyIntent
   data class HypotheticalScheduleDelayIntent(val delayMinutes: Int = 10) : WeykyIntent
 
+  // Compound Sequential Intents
+  data class CompoundStep(
+    val index: Int,
+    val segmentQuery: String,
+    val intent: WeykyIntent
+  )
+
+  data class CompoundIntent(
+    val steps: List<CompoundStep>,
+    val rawQuery: String
+  ) : WeykyIntent
+
   data class UnknownIntent(val rawQuery: String) : WeykyIntent
 }
 
