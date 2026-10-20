@@ -11,6 +11,8 @@ import android.util.Log
 import android.view.KeyEvent
 import com.example.device.notifications.NotificationRepository
 import com.example.device.notifications.WeykyNotificationListenerService
+import android.graphics.Bitmap
+import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +23,8 @@ data class ActiveMediaMetadata(
   val artist: String? = null,
   val album: String? = null,
   val isPlaying: Boolean = false,
-  val packageName: String? = null
+  val packageName: String? = null,
+  val artworkBitmap: Bitmap? = null
 )
 
 sealed interface MediaControlResult {
@@ -69,14 +72,31 @@ class MediaPlaybackController(private val context: Context) {
         ?: controller.metadata?.description?.subtitle?.toString()
       val album = meta?.getString(MediaMetadata.METADATA_KEY_ALBUM)
 
+      val artworkBitmap = meta?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+        ?: meta?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+        ?: meta?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+        ?: controller.metadata?.description?.iconBitmap
+        ?: try {
+          controller.packageName?.let { pkg ->
+            val pm = context.packageManager
+            val d = pm.getApplicationIcon(pkg)
+            val density = context.resources.displayMetrics.density
+            val sizePx = (52 * density).toInt().coerceAtLeast(48)
+            d.toBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+          }
+        } catch (_: Exception) {
+          null
+        }
+
       _mediaState.value = ActiveMediaMetadata(
         title = title,
         artist = artist,
         album = album,
         isPlaying = isPlaying,
-        packageName = controller.packageName
+        packageName = controller.packageName,
+        artworkBitmap = artworkBitmap
       )
-      Log.d("WEYKY_MEDIA", "playing=$isPlaying, title=$title, artist=$artist")
+      Log.d("WEYKY_MEDIA", "playing=$isPlaying, title=$title, artist=$artist, artwork=${artworkBitmap != null}")
     } else {
       val isPlaying = audioManager?.isMusicActive == true
       // Fallback: check active ongoing/media notifications for track title & artist
@@ -87,11 +107,23 @@ class MediaPlaybackController(private val context: Context) {
           pkg.contains("anghami") || pkg.contains("deezer") || pkg.contains("youtube") ||
           pkg.contains("vlc") || pkg.contains("audio") || pkg.contains("player")
       }
+      val notifArtwork = mediaNotif?.packageName?.let { pkg ->
+        try {
+          val pm = context.packageManager
+          val d = pm.getApplicationIcon(pkg)
+          val density = context.resources.displayMetrics.density
+          val sizePx = (52 * density).toInt().coerceAtLeast(48)
+          d.toBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        } catch (_: Exception) {
+          null
+        }
+      }
       _mediaState.value = ActiveMediaMetadata(
         title = mediaNotif?.title?.ifBlank { null },
         artist = mediaNotif?.text?.ifBlank { null },
         isPlaying = isPlaying,
-        packageName = mediaNotif?.packageName
+        packageName = mediaNotif?.packageName,
+        artworkBitmap = notifArtwork
       )
     }
   }

@@ -79,8 +79,15 @@ object WindowSizeResolver {
       posture == DevicePosture.TABLETOP && heightDp >= 440.dp -> AdaptiveLayoutMode.FOLDABLE_TABLETOP
       posture == DevicePosture.BOOK && widthDp >= 580.dp -> AdaptiveLayoutMode.FOLDABLE_BOOK
       isCompactLandscape -> AdaptiveLayoutMode.PHONE_LANDSCAPE
-      isTablet || widthClass == WindowWidthSizeClass.EXPANDED -> AdaptiveLayoutMode.TABLET_EXPANDED
+      orientation == AdaptiveOrientation.LANDSCAPE -> {
+        if (widthClass == WindowWidthSizeClass.EXPANDED || isTablet) {
+          AdaptiveLayoutMode.TABLET_EXPANDED
+        } else {
+          AdaptiveLayoutMode.PHONE_LANDSCAPE
+        }
+      }
       isSplitScreen && widthDp < 420.dp -> AdaptiveLayoutMode.SPLIT_SCREEN_COMPACT
+      isTablet || widthClass == WindowWidthSizeClass.EXPANDED -> AdaptiveLayoutMode.TABLET_EXPANDED
       else -> AdaptiveLayoutMode.PHONE_PORTRAIT
     }
 

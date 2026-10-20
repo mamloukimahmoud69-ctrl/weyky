@@ -224,4 +224,36 @@ class AdaptiveLayoutStateTest {
     val coreSize = profile.calculateAdaptiveCoreSize(0.44f)
     assertTrue("Core size should be positive and adapt to reduced height", coreSize > 0.dp)
   }
+
+  @Test
+  fun `landscape medium window resolves to phone landscape mode and not portrait`() {
+    val profile = WindowSizeResolver.resolve(
+      widthDp = 750.dp,
+      heightDp = 520.dp,
+      isRtl = false,
+      windowOrientation = AdaptiveOrientation.LANDSCAPE
+    )
+
+    assertEquals(AdaptiveOrientation.LANDSCAPE, profile.orientation)
+    assertEquals(AdaptiveLayoutMode.PHONE_LANDSCAPE, profile.layoutMode)
+    val coreSize = profile.calculateAdaptiveCoreSize(0.44f)
+    assertTrue("Core size must adapt safely", coreSize in 90.dp..280.dp)
+  }
+
+  @Test
+  fun `landscape wide window resolves to tablet expanded mode`() {
+    val profile = WindowSizeResolver.resolve(
+      widthDp = 1200.dp,
+      heightDp = 800.dp,
+      isRtl = false,
+      windowOrientation = AdaptiveOrientation.LANDSCAPE
+    )
+
+    assertEquals(AdaptiveOrientation.LANDSCAPE, profile.orientation)
+    assertEquals(AdaptiveLayoutMode.TABLET_EXPANDED, profile.layoutMode)
+    assertEquals(CardDensity.EXPANDED, profile.cardDensity)
+    assertTrue("Padding should expand appropriately", profile.contentPaddingHorizontalDp >= 16.dp)
+    val coreSize = profile.calculateAdaptiveCoreSize(0.44f)
+    assertTrue("Core size should be generous on wide tablet", coreSize >= 160.dp)
+  }
 }
