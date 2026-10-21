@@ -252,6 +252,35 @@ object IntentParser {
       "device_detailed_specs" -> return WeykyIntent.DeviceInfoDetailedIntent
     }
 
+    // Contextual Follow-up: Additional Navigation Scenario on previous battery forecast
+    if (session?.lastBatteryScenario != null &&
+      (input.contains("ملاحة") || input.contains("الملاحة") || input.contains("ملاحه") || input.contains("خرائط") || input.contains("navigation") || input.contains("gps")) &&
+      (input.contains("لو") || input.contains("ماذا") || input.contains("ايضا") || input.contains("ايضاً") || input.contains("also") || input.contains("what about"))
+    ) {
+      return WeykyIntent.TimeAwareBatteryForecastIntent(
+        rawQuery = rawInput,
+        target = null,
+        includesMusic = session.lastBatteryScenario!!.includesMusic,
+        isFollowUpNavigation = true
+      )
+    }
+
+    // Time-Aware Battery Forecast: "كم ستتبقى من البطارية حتى المساء؟" / "هل ستكفي البطارية حتى الساعة السادسة؟"
+    if (com.example.core.intelligence.battery.BatteryTargetTimeExtractor.isBatteryForecastQuery(input)) {
+      val target = com.example.core.intelligence.battery.BatteryTargetTimeExtractor.extractTargetTime(input)
+      if (target != null) {
+        val includesMusic = input.contains("موسيقى") || input.contains("موسيقي") ||
+          input.contains("اغنية") || input.contains("أغنية") ||
+          input.contains("music") || input.contains("song")
+        return WeykyIntent.TimeAwareBatteryForecastIntent(
+          rawQuery = rawInput,
+          target = target,
+          includesMusic = includesMusic,
+          isFollowUpNavigation = false
+        )
+      }
+    }
+
     // Contextual Weather follow-ups when previous topic was weather or direct weather questions
     val isWeatherContext = session?.currentTopic == "weather" || session?.lastReferencedSubject == "weather"
 

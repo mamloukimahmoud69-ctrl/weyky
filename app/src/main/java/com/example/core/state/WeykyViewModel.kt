@@ -227,7 +227,8 @@ class WeykyViewModel(application: Application) : AndroidViewModel(application) {
 
   val localConversationalEngine = com.example.core.intelligence.conversation.LocalConversationalEngine(
     situationSnapshotBuilder = situationSnapshotBuilder,
-    deviceInfoProvider = deviceInfoProvider
+    deviceInfoProvider = deviceInfoProvider,
+    contextReasoningEngine = contextReasoningEngine
   )
 
   private val intentExecutor = IntentExecutor(

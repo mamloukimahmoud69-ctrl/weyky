@@ -13,10 +13,12 @@ import java.util.Locale
  */
 class LocalConversationalEngine(
   private val situationSnapshotBuilder: SituationSnapshotBuilder? = null,
-  deviceInfoProvider: DeviceInfoProvider? = null
+  deviceInfoProvider: DeviceInfoProvider? = null,
+  private val contextReasoningEngine: com.example.core.intelligence.ContextReasoningEngine = com.example.core.intelligence.ContextReasoningEngine(),
+  timeProvider: com.example.core.intelligence.time.TimeProvider = com.example.core.intelligence.time.SystemTimeProvider()
 ) {
   val session = ConversationSession()
-  private val reasoner = ConversationalReasoner(deviceInfoProvider)
+  private val reasoner = ConversationalReasoner(deviceInfoProvider, timeProvider)
 
   suspend fun respond(userQuery: String): ConversationalResponse {
     val query = userQuery.trim()
@@ -27,8 +29,7 @@ class LocalConversationalEngine(
     if (requirements.domain != IntentDomain.GENERAL && requirements.domain != IntentDomain.DIRECT_COMMAND) {
       val situation = situationSnapshotBuilder?.captureSnapshot(requirements)
       if (situation != null) {
-        val reasoningEngine = com.example.core.intelligence.ContextReasoningEngine()
-        val synthesis = reasoningEngine.synthesize(requirements, situation, query)
+        val synthesis = contextReasoningEngine.synthesize(requirements, situation, query)
 
         val suggestions = mutableListOf<ActionableOption>()
         synthesis.nextStep?.let { step ->

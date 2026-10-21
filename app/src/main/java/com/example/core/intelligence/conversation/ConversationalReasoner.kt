@@ -9,8 +9,10 @@ import java.util.Locale
  * dialect understanding, and genuine on-device decision-making without misleading canned templates.
  */
 class ConversationalReasoner(
-  private val deviceInfoProvider: DeviceInfoProvider? = null
+  private val deviceInfoProvider: DeviceInfoProvider? = null,
+  private val timeProvider: com.example.core.intelligence.time.TimeProvider = com.example.core.intelligence.time.SystemTimeProvider()
 ) {
+  private val batteryForecastCalculator = com.example.core.intelligence.battery.BatteryForecastCalculator(timeProvider)
 
   data class ReasoningResult(
     val replyText: String,
@@ -147,6 +149,9 @@ class ConversationalReasoner(
   }
 
   private fun isFollowUpQuery(query: String, session: ConversationSession): Boolean {
+    if (session.lastBatteryScenario != null && (query.contains("ملاحة") || query.contains("ملاحه") || query.contains("خرائط") || query.contains("navigation") || query.contains("gps"))) {
+      return true
+    }
     if (session.currentTopic == "device_info" || session.lastReferencedSubject == "phone") {
       if (query.contains("عنه") || query.contains("مواصفاته") || query.contains("تفاصيله") || query.contains("about it")) {
         return true
@@ -168,6 +173,21 @@ class ConversationalReasoner(
     session: ConversationSession,
     isArabic: Boolean
   ): ReasoningResult? {
+    // 0. Battery scenario follow-up: "وماذا لو استخدمت الملاحة أيضًا؟"
+    if (session.lastBatteryScenario != null && (query.contains("ملاحة") || query.contains("ملاحه") || query.contains("خرائط") || query.contains("navigation") || query.contains("gps"))) {
+      val prevScenario = session.lastBatteryScenario!!
+      val limitation = batteryForecastCalculator.reasonNavigationFollowUp(prevScenario, isArabic)
+      session.lastBatteryScenario = limitation.updatedScenario
+      return ReasoningResult(
+        replyText = limitation.synthesis.synthesizedSpeech,
+        topicDetected = "battery",
+        proactiveSuggestions = listOf(
+          ActionableOption(if (isArabic) "فحص البطارية" else "Battery level", "كم نسبة البطارية؟"),
+          ActionableOption(if (isArabic) "تفعيل توفير الطاقة" else "Battery saver", "تفعيل توفير الطاقة")
+        )
+      )
+    }
+
     val topic = session.currentTopic ?: return null
 
     // Follow-up about phone: "وماذا تعرف عنه؟"
