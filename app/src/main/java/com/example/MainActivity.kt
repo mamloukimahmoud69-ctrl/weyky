@@ -20,6 +20,7 @@ import com.example.core.state.WeykyViewModel
 import com.example.ui.home.HomeScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.WeykyThemeMode
 
 class MainActivity : ComponentActivity() {
   private val viewModel: WeykyViewModel by viewModels()
@@ -59,9 +60,15 @@ class MainActivity : ComponentActivity() {
           // In Default Launcher mode, Home surface is root; pressing Back does not finish activity
         }
 
+        val rootSurfaceColor = when (uiState.themeMode) {
+          WeykyThemeMode.MODERN -> Color(0xFF020611)
+          WeykyThemeMode.MINIMAL -> Color(0xFF0C131B)
+          WeykyThemeMode.TACTICAL -> Color(uiState.backgroundColorHex)
+        }
+
         Surface(
           modifier = Modifier.fillMaxSize(),
-          color = Color(uiState.backgroundColorHex)
+          color = rootSurfaceColor
         ) {
           when (uiState.currentScreen) {
             WeykyScreen.MAIN -> {
@@ -108,6 +115,9 @@ class MainActivity : ComponentActivity() {
                 onSetLightMode = { isLight -> viewModel.setLightMode(isLight) },
                 onUpdateBackgroundColor = { colorHex -> viewModel.updateBackgroundColor(colorHex) },
                 onUpdateCardBorderColor = { colorHex -> viewModel.updateCardBorderColor(colorHex) },
+                onSelectTheme = { mode -> viewModel.setThemeMode(mode) },
+                onUpdateMinimalConfig = { config -> viewModel.updateMinimalBackgroundConfig(config) },
+                onResetAllDefaults = { viewModel.resetAppearanceDefaults() },
                 isNotificationAccessGranted = isNotifAccessGranted,
                 onRequestDefaultLauncher = {
                   val intent = viewModel.createRequestRoleIntent()

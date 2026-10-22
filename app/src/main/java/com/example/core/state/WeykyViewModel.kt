@@ -62,6 +62,9 @@ import com.example.device.weather.LocationProvider
 import com.example.device.weather.RealWeatherProvider
 import com.example.device.weather.WeatherSnapshot
 import com.example.rendering.visual_state.CoreVisualState
+import com.example.ui.theme.WeykyThemeMode
+import com.example.ui.theme.MinimalBackgroundConfig
+import com.example.ui.theme.MinimalBackgroundType
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -136,7 +139,9 @@ data class WeykyUiState(
   val isNotificationPrivacyEnabled: Boolean = false,
   val isHeadsetButtonEnabled: Boolean = false,
   val currentEnglishDateString: String = "",
-  val currentScreen: WeykyScreen = WeykyScreen.MAIN
+  val currentScreen: WeykyScreen = WeykyScreen.MAIN,
+  val themeMode: WeykyThemeMode = WeykyThemeMode.TACTICAL,
+  val minimalBackgroundConfig: MinimalBackgroundConfig = MinimalBackgroundConfig()
 )
 
 class WeykyViewModel(application: Application) : AndroidViewModel(application) {
@@ -277,13 +282,35 @@ class WeykyViewModel(application: Application) : AndroidViewModel(application) {
   private val prefs = context.getSharedPreferences("weyky_Appearance_prefs", android.content.Context.MODE_PRIVATE)
 
   private val _uiState = MutableStateFlow(
-    WeykyUiState(
-      isLightMode = prefs.getBoolean("is_light_mode", false),
-      backgroundColorHex = prefs.getLong("bg_color_hex", 0xFF000000L),
-      cardBorderColorHex = prefs.getLong("border_color_hex", 0xFF00F0FFL),
-      cloudTtsVoiceName = prefs.getString("cloud_tts_voice", com.example.core.voice.engine.EdgeNeuralTtsEngine.DEFAULT_VOICE)
-        ?: com.example.core.voice.engine.EdgeNeuralTtsEngine.DEFAULT_VOICE
-    )
+    run {
+      val savedTheme = WeykyThemeMode.fromId(prefs.getString("theme_mode", "tactical"))
+      val savedBgTypeStr = prefs.getString("minimal_bg_type", "DEFAULT") ?: "DEFAULT"
+      val savedBgType = try {
+        MinimalBackgroundType.valueOf(savedBgTypeStr)
+      } catch (e: Exception) {
+        MinimalBackgroundType.DEFAULT
+      }
+      val savedMinimalConfig = MinimalBackgroundConfig(
+        type = savedBgType,
+        solidColorHex = prefs.getLong("minimal_bg_solid_hex", 0xFF0D141CL),
+        gradientStartHex = prefs.getLong("minimal_bg_grad_start", 0xFF0B141EL),
+        gradientEndHex = prefs.getLong("minimal_bg_grad_end", 0xFF17283AL),
+        presetWallpaperId = prefs.getString("minimal_bg_preset_id", "abstract_slate") ?: "abstract_slate",
+        customImagePath = prefs.getString("minimal_bg_custom_path", null),
+        dimmingAlpha = prefs.getFloat("minimal_bg_dimming", 0.40f),
+        favoriteWallpaperIds = prefs.getStringSet("minimal_bg_favorites", setOf("abstract_slate", "cosmic_nebula"))?.toSet() ?: emptySet()
+      )
+
+      WeykyUiState(
+        isLightMode = prefs.getBoolean("is_light_mode", false),
+        backgroundColorHex = prefs.getLong("bg_color_hex", 0xFF000000L),
+        cardBorderColorHex = prefs.getLong("border_color_hex", 0xFF00F0FFL),
+        cloudTtsVoiceName = prefs.getString("cloud_tts_voice", com.example.core.voice.engine.EdgeNeuralTtsEngine.DEFAULT_VOICE)
+          ?: com.example.core.voice.engine.EdgeNeuralTtsEngine.DEFAULT_VOICE,
+        themeMode = savedTheme,
+        minimalBackgroundConfig = savedMinimalConfig
+      )
+    }
   )
   val uiState: StateFlow<WeykyUiState> = _uiState.asStateFlow()
 
@@ -1170,6 +1197,51 @@ class WeykyViewModel(application: Application) : AndroidViewModel(application) {
   fun updateCardBorderColor(colorHex: Long) {
     prefs.edit().putLong("border_color_hex", colorHex).apply()
     _uiState.update { it.copy(cardBorderColorHex = colorHex) }
+  }
+
+  fun setThemeMode(mode: WeykyThemeMode) {
+    prefs.edit().putString("theme_mode", mode.id).apply()
+    _uiState.update { it.copy(themeMode = mode) }
+  }
+
+  fun updateMinimalBackgroundConfig(config: MinimalBackgroundConfig) {
+    prefs.edit()
+      .putString("minimal_bg_type", config.type.name)
+      .putLong("minimal_bg_solid_hex", config.solidColorHex)
+      .putLong("minimal_bg_grad_start", config.gradientStartHex)
+      .putLong("minimal_bg_grad_end", config.gradientEndHex)
+      .putString("minimal_bg_preset_id", config.presetWallpaperId)
+      .putString("minimal_bg_custom_path", config.customImagePath)
+      .putFloat("minimal_bg_dimming", config.dimmingAlpha)
+      .putStringSet("minimal_bg_favorites", config.favoriteWallpaperIds)
+      .apply()
+    _uiState.update { it.copy(minimalBackgroundConfig = config) }
+  }
+
+  fun resetAppearanceDefaults() {
+    val defaultMinimal = MinimalBackgroundConfig()
+    prefs.edit()
+      .putString("theme_mode", WeykyThemeMode.TACTICAL.id)
+      .putLong("bg_color_hex", 0xFF000000L)
+      .putLong("border_color_hex", 0xFF00F0FFL)
+      .putBoolean("is_light_mode", false)
+      .putString("minimal_bg_type", defaultMinimal.type.name)
+      .putLong("minimal_bg_solid_hex", defaultMinimal.solidColorHex)
+      .putLong("minimal_bg_grad_start", defaultMinimal.gradientStartHex)
+      .putLong("minimal_bg_grad_end", defaultMinimal.gradientEndHex)
+      .putString("minimal_bg_preset_id", defaultMinimal.presetWallpaperId)
+      .remove("minimal_bg_custom_path")
+      .putFloat("minimal_bg_dimming", defaultMinimal.dimmingAlpha)
+      .apply()
+    _uiState.update {
+      it.copy(
+        themeMode = WeykyThemeMode.TACTICAL,
+        backgroundColorHex = 0xFF000000L,
+        cardBorderColorHex = 0xFF00F0FFL,
+        isLightMode = false,
+        minimalBackgroundConfig = defaultMinimal.copy(favoriteWallpaperIds = it.minimalBackgroundConfig.favoriteWallpaperIds)
+      )
+    }
   }
 
   private fun scheduleVisualStateReset(delayMillis: Long = 4500) {

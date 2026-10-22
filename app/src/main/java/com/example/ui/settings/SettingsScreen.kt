@@ -57,6 +57,8 @@ import com.example.ui.adaptive.rememberAdaptiveLayoutState
 import com.example.ui.theme.JarvisHudBadge
 import com.example.ui.theme.JarvisHudCard
 import com.example.ui.theme.JarvisHudColors
+import com.example.ui.theme.MinimalBackgroundConfig
+import com.example.ui.theme.WeykyThemeMode
 import com.example.ui.theme.jarvisTacticalBackground
 
 @Composable
@@ -68,6 +70,9 @@ fun SettingsScreen(
   onSetLightMode: (Boolean) -> Unit = {},
   onUpdateBackgroundColor: (Long) -> Unit = {},
   onUpdateCardBorderColor: (Long) -> Unit = {},
+  onSelectTheme: (WeykyThemeMode) -> Unit = {},
+  onUpdateMinimalConfig: (MinimalBackgroundConfig) -> Unit = {},
+  onResetAllDefaults: () -> Unit = {},
   isNotificationAccessGranted: Boolean,
   onRequestDefaultLauncher: () -> Unit = {},
   onDownloadModel: (VoiceModelInfo) -> Unit = {},
@@ -146,6 +151,9 @@ fun SettingsScreen(
         onSetLightMode = onSetLightMode,
         onUpdateBackgroundColor = onUpdateBackgroundColor,
         onUpdateCardBorderColor = onUpdateCardBorderColor,
+        onSelectTheme = onSelectTheme,
+        onUpdateMinimalConfig = onUpdateMinimalConfig,
+        onResetAllDefaults = onResetAllDefaults,
         onTogglePowerSaving = onTogglePowerSaving,
         onRequestDefaultLauncher = onRequestDefaultLauncher,
         isNotificationAccessGranted = isNotificationAccessGranted,
@@ -175,6 +183,9 @@ fun SettingsScreen(
         onSetLightMode = onSetLightMode,
         onUpdateBackgroundColor = onUpdateBackgroundColor,
         onUpdateCardBorderColor = onUpdateCardBorderColor,
+        onSelectTheme = onSelectTheme,
+        onUpdateMinimalConfig = onUpdateMinimalConfig,
+        onResetAllDefaults = onResetAllDefaults,
         onTogglePowerSaving = onTogglePowerSaving,
         onRequestDefaultLauncher = onRequestDefaultLauncher,
         isNotificationAccessGranted = isNotificationAccessGranted,
@@ -210,6 +221,9 @@ private fun LandscapeDesktopSettingsLayout(
   onSetLightMode: (Boolean) -> Unit,
   onUpdateBackgroundColor: (Long) -> Unit,
   onUpdateCardBorderColor: (Long) -> Unit,
+  onSelectTheme: (WeykyThemeMode) -> Unit,
+  onUpdateMinimalConfig: (MinimalBackgroundConfig) -> Unit,
+  onResetAllDefaults: () -> Unit,
   onTogglePowerSaving: () -> Unit,
   onRequestDefaultLauncher: () -> Unit,
   isNotificationAccessGranted: Boolean,
@@ -473,6 +487,9 @@ private fun LandscapeDesktopSettingsLayout(
                   onSetLightMode = onSetLightMode,
                   onUpdateBackgroundColor = onUpdateBackgroundColor,
                   onUpdateCardBorderColor = onUpdateCardBorderColor,
+                  onSelectTheme = onSelectTheme,
+                  onUpdateMinimalConfig = onUpdateMinimalConfig,
+                  onResetAllDefaults = onResetAllDefaults,
                   isGrouped = true
                 )
               }
@@ -572,6 +589,9 @@ private fun PortraitSettingsLayout(
   onSetLightMode: (Boolean) -> Unit,
   onUpdateBackgroundColor: (Long) -> Unit,
   onUpdateCardBorderColor: (Long) -> Unit,
+  onSelectTheme: (WeykyThemeMode) -> Unit,
+  onUpdateMinimalConfig: (MinimalBackgroundConfig) -> Unit,
+  onResetAllDefaults: () -> Unit,
   onTogglePowerSaving: () -> Unit,
   onRequestDefaultLauncher: () -> Unit,
   isNotificationAccessGranted: Boolean,
@@ -662,6 +682,9 @@ private fun PortraitSettingsLayout(
           onSetLightMode = onSetLightMode,
           onUpdateBackgroundColor = onUpdateBackgroundColor,
           onUpdateCardBorderColor = onUpdateCardBorderColor,
+          onSelectTheme = onSelectTheme,
+          onUpdateMinimalConfig = onUpdateMinimalConfig,
+          onResetAllDefaults = onResetAllDefaults,
           isGrouped = false
         )
       }

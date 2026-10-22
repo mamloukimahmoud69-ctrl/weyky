@@ -36,7 +36,10 @@ import com.example.ui.adaptive.DevicePosture
 import com.example.ui.adaptive.DeviceProfile
 import com.example.ui.adaptive.rememberAdaptiveLayoutState
 import com.example.ui.theme.JarvisHudColors
+import com.example.ui.theme.MinimalBackgroundContainer
+import com.example.ui.theme.WeykyThemeMode
 import com.example.ui.theme.jarvisTacticalBackground
+import com.example.ui.theme.modernCinematicBackground
 
 @Composable
 fun HomeScreen(
@@ -65,13 +68,22 @@ fun HomeScreen(
   val textSecondary = JarvisHudColors.textSecondary(isLight)
   val textMuted = JarvisHudColors.textMuted(isLight)
 
+  val themeModifier = when (uiState.themeMode) {
+    WeykyThemeMode.TACTICAL -> Modifier.jarvisTacticalBackground(
+      backgroundColor = bgColor,
+      accentColor = borderColor
+    )
+    WeykyThemeMode.MODERN -> Modifier.modernCinematicBackground(
+      visualState = uiState.visualState,
+      isPowerSaving = uiState.isPowerSaving
+    )
+    WeykyThemeMode.MINIMAL -> Modifier
+  }
+
   BoxWithConstraints(
     modifier = modifier
       .fillMaxSize()
-      .jarvisTacticalBackground(
-        backgroundColor = bgColor,
-        accentColor = borderColor
-      )
+      .then(themeModifier)
       .statusBarsPadding()
       .navigationBarsPadding()
       .imePadding()
@@ -83,127 +95,209 @@ fun HomeScreen(
       containerHeightDp = maxHeight
     )
 
-    when (deviceProfile.layoutMode) {
-      AdaptiveLayoutMode.PHONE_LANDSCAPE -> {
-        PhoneLandscapeHomeScreen(
-          uiState = uiState,
-          deviceProfile = deviceProfile,
-          borderColor = borderColor,
-          panelBg = panelBg,
-          panelBgElevated = panelBgElevated,
-          textPrimary = textPrimary,
-          textSecondary = textSecondary,
-          textMuted = textMuted,
-          isLight = isLight,
-          onQuerySubmit = onQuerySubmit,
-          onQueryChange = onQueryChange,
-          onOpenSettings = onOpenSettings,
-          onRequestPermission = onRequestPermission,
-          onToggleVoice = onToggleVoice,
-          onConfirmOption = onConfirmOption,
-          onToggleAppDrawer = onToggleAppDrawer,
-          onToggleMediaPlayback = onToggleMediaPlayback,
-          onNextMediaTrack = onNextMediaTrack,
-          onPreviousMediaTrack = onPreviousMediaTrack,
-          keyboardController = keyboardController
-        )
+    val isLandscape = deviceProfile.layoutMode == AdaptiveLayoutMode.PHONE_LANDSCAPE ||
+      deviceProfile.layoutMode == AdaptiveLayoutMode.TABLET_EXPANDED ||
+      deviceProfile.layoutMode == AdaptiveLayoutMode.FOLDABLE_BOOK
+
+    when (uiState.themeMode) {
+      WeykyThemeMode.MODERN -> {
+        if (isLandscape) {
+          ModernLandscapeHomeScreen(
+            uiState = uiState,
+            deviceProfile = deviceProfile,
+            onQuerySubmit = onQuerySubmit,
+            onQueryChange = onQueryChange,
+            onOpenSettings = onOpenSettings,
+            onRequestPermission = onRequestPermission,
+            onToggleVoice = onToggleVoice,
+            onConfirmOption = onConfirmOption,
+            onToggleAppDrawer = onToggleAppDrawer,
+            onToggleMediaPlayback = onToggleMediaPlayback,
+            onNextMediaTrack = onNextMediaTrack,
+            onPreviousMediaTrack = onPreviousMediaTrack,
+            keyboardController = keyboardController
+          )
+        } else {
+          ModernPortraitHomeScreen(
+            uiState = uiState,
+            deviceProfile = deviceProfile,
+            onQuerySubmit = onQuerySubmit,
+            onQueryChange = onQueryChange,
+            onOpenSettings = onOpenSettings,
+            onRequestPermission = onRequestPermission,
+            onToggleVoice = onToggleVoice,
+            onConfirmOption = onConfirmOption,
+            onToggleAppDrawer = onToggleAppDrawer,
+            onToggleMediaPlayback = onToggleMediaPlayback,
+            onNextMediaTrack = onNextMediaTrack,
+            onPreviousMediaTrack = onPreviousMediaTrack,
+            keyboardController = keyboardController
+          )
+        }
       }
-      AdaptiveLayoutMode.TABLET_EXPANDED,
-      AdaptiveLayoutMode.FOLDABLE_BOOK -> {
-        TabletExpandedHomeScreen(
-          uiState = uiState,
-          deviceProfile = deviceProfile,
-          borderColor = borderColor,
-          panelBg = panelBg,
-          panelBgElevated = panelBgElevated,
-          textPrimary = textPrimary,
-          textSecondary = textSecondary,
-          textMuted = textMuted,
-          isLight = isLight,
-          onQuerySubmit = onQuerySubmit,
-          onQueryChange = onQueryChange,
-          onOpenSettings = onOpenSettings,
-          onRequestPermission = onRequestPermission,
-          onToggleVoice = onToggleVoice,
-          onConfirmOption = onConfirmOption,
-          onToggleAppDrawer = onToggleAppDrawer,
-          onToggleMediaPlayback = onToggleMediaPlayback,
-          onNextMediaTrack = onNextMediaTrack,
-          onPreviousMediaTrack = onPreviousMediaTrack,
-          keyboardController = keyboardController
-        )
+
+      WeykyThemeMode.MINIMAL -> {
+        MinimalBackgroundContainer(config = uiState.minimalBackgroundConfig) {
+          if (isLandscape) {
+            MinimalLandscapeHomeScreen(
+              uiState = uiState,
+              deviceProfile = deviceProfile,
+              onQuerySubmit = onQuerySubmit,
+              onQueryChange = onQueryChange,
+              onOpenSettings = onOpenSettings,
+              onRequestPermission = onRequestPermission,
+              onToggleVoice = onToggleVoice,
+              onConfirmOption = onConfirmOption,
+              onToggleAppDrawer = onToggleAppDrawer,
+              onToggleMediaPlayback = onToggleMediaPlayback,
+              onNextMediaTrack = onNextMediaTrack,
+              onPreviousMediaTrack = onPreviousMediaTrack,
+              keyboardController = keyboardController
+            )
+          } else {
+            MinimalPortraitHomeScreen(
+              uiState = uiState,
+              deviceProfile = deviceProfile,
+              onQuerySubmit = onQuerySubmit,
+              onQueryChange = onQueryChange,
+              onOpenSettings = onOpenSettings,
+              onRequestPermission = onRequestPermission,
+              onToggleVoice = onToggleVoice,
+              onConfirmOption = onConfirmOption,
+              onToggleAppDrawer = onToggleAppDrawer,
+              onToggleMediaPlayback = onToggleMediaPlayback,
+              onNextMediaTrack = onNextMediaTrack,
+              onPreviousMediaTrack = onPreviousMediaTrack,
+              keyboardController = keyboardController
+            )
+          }
+        }
       }
-      AdaptiveLayoutMode.FOLDABLE_TABLETOP -> {
-        FoldableTabletopHomeScreen(
-          uiState = uiState,
-          deviceProfile = deviceProfile,
-          borderColor = borderColor,
-          panelBg = panelBg,
-          panelBgElevated = panelBgElevated,
-          textPrimary = textPrimary,
-          textSecondary = textSecondary,
-          textMuted = textMuted,
-          isLight = isLight,
-          onQuerySubmit = onQuerySubmit,
-          onQueryChange = onQueryChange,
-          onOpenSettings = onOpenSettings,
-          onRequestPermission = onRequestPermission,
-          onToggleVoice = onToggleVoice,
-          onConfirmOption = onConfirmOption,
-          onToggleAppDrawer = onToggleAppDrawer,
-          onToggleMediaPlayback = onToggleMediaPlayback,
-          onNextMediaTrack = onNextMediaTrack,
-          onPreviousMediaTrack = onPreviousMediaTrack,
-          keyboardController = keyboardController
-        )
-      }
-      AdaptiveLayoutMode.SPLIT_SCREEN_COMPACT -> {
-        SplitScreenCompactHomeScreen(
-          uiState = uiState,
-          deviceProfile = deviceProfile,
-          borderColor = borderColor,
-          panelBg = panelBg,
-          panelBgElevated = panelBgElevated,
-          textPrimary = textPrimary,
-          textSecondary = textSecondary,
-          textMuted = textMuted,
-          isLight = isLight,
-          onQuerySubmit = onQuerySubmit,
-          onQueryChange = onQueryChange,
-          onOpenSettings = onOpenSettings,
-          onRequestPermission = onRequestPermission,
-          onToggleVoice = onToggleVoice,
-          onConfirmOption = onConfirmOption,
-          onToggleAppDrawer = onToggleAppDrawer,
-          onToggleMediaPlayback = onToggleMediaPlayback,
-          onNextMediaTrack = onNextMediaTrack,
-          onPreviousMediaTrack = onPreviousMediaTrack,
-          keyboardController = keyboardController
-        )
-      }
-      AdaptiveLayoutMode.PHONE_PORTRAIT -> {
-        PhonePortraitHomeScreen(
-          uiState = uiState,
-          deviceProfile = deviceProfile,
-          borderColor = borderColor,
-          panelBg = panelBg,
-          panelBgElevated = panelBgElevated,
-          textPrimary = textPrimary,
-          textSecondary = textSecondary,
-          textMuted = textMuted,
-          isLight = isLight,
-          onQuerySubmit = onQuerySubmit,
-          onQueryChange = onQueryChange,
-          onOpenSettings = onOpenSettings,
-          onRequestPermission = onRequestPermission,
-          onToggleVoice = onToggleVoice,
-          onConfirmOption = onConfirmOption,
-          onToggleAppDrawer = onToggleAppDrawer,
-          onToggleMediaPlayback = onToggleMediaPlayback,
-          onNextMediaTrack = onNextMediaTrack,
-          onPreviousMediaTrack = onPreviousMediaTrack,
-          keyboardController = keyboardController
-        )
+
+      WeykyThemeMode.TACTICAL -> {
+        when (deviceProfile.layoutMode) {
+          AdaptiveLayoutMode.PHONE_LANDSCAPE -> {
+            PhoneLandscapeHomeScreen(
+              uiState = uiState,
+              deviceProfile = deviceProfile,
+              borderColor = borderColor,
+              panelBg = panelBg,
+              panelBgElevated = panelBgElevated,
+              textPrimary = textPrimary,
+              textSecondary = textSecondary,
+              textMuted = textMuted,
+              isLight = isLight,
+              onQuerySubmit = onQuerySubmit,
+              onQueryChange = onQueryChange,
+              onOpenSettings = onOpenSettings,
+              onRequestPermission = onRequestPermission,
+              onToggleVoice = onToggleVoice,
+              onConfirmOption = onConfirmOption,
+              onToggleAppDrawer = onToggleAppDrawer,
+              onToggleMediaPlayback = onToggleMediaPlayback,
+              onNextMediaTrack = onNextMediaTrack,
+              onPreviousMediaTrack = onPreviousMediaTrack,
+              keyboardController = keyboardController
+            )
+          }
+          AdaptiveLayoutMode.TABLET_EXPANDED,
+          AdaptiveLayoutMode.FOLDABLE_BOOK -> {
+            TabletExpandedHomeScreen(
+              uiState = uiState,
+              deviceProfile = deviceProfile,
+              borderColor = borderColor,
+              panelBg = panelBg,
+              panelBgElevated = panelBgElevated,
+              textPrimary = textPrimary,
+              textSecondary = textSecondary,
+              textMuted = textMuted,
+              isLight = isLight,
+              onQuerySubmit = onQuerySubmit,
+              onQueryChange = onQueryChange,
+              onOpenSettings = onOpenSettings,
+              onRequestPermission = onRequestPermission,
+              onToggleVoice = onToggleVoice,
+              onConfirmOption = onConfirmOption,
+              onToggleAppDrawer = onToggleAppDrawer,
+              onToggleMediaPlayback = onToggleMediaPlayback,
+              onNextMediaTrack = onNextMediaTrack,
+              onPreviousMediaTrack = onPreviousMediaTrack,
+              keyboardController = keyboardController
+            )
+          }
+          AdaptiveLayoutMode.FOLDABLE_TABLETOP -> {
+            FoldableTabletopHomeScreen(
+              uiState = uiState,
+              deviceProfile = deviceProfile,
+              borderColor = borderColor,
+              panelBg = panelBg,
+              panelBgElevated = panelBgElevated,
+              textPrimary = textPrimary,
+              textSecondary = textSecondary,
+              textMuted = textMuted,
+              isLight = isLight,
+              onQuerySubmit = onQuerySubmit,
+              onQueryChange = onQueryChange,
+              onOpenSettings = onOpenSettings,
+              onRequestPermission = onRequestPermission,
+              onToggleVoice = onToggleVoice,
+              onConfirmOption = onConfirmOption,
+              onToggleAppDrawer = onToggleAppDrawer,
+              onToggleMediaPlayback = onToggleMediaPlayback,
+              onNextMediaTrack = onNextMediaTrack,
+              onPreviousMediaTrack = onPreviousMediaTrack,
+              keyboardController = keyboardController
+            )
+          }
+          AdaptiveLayoutMode.SPLIT_SCREEN_COMPACT -> {
+            SplitScreenCompactHomeScreen(
+              uiState = uiState,
+              deviceProfile = deviceProfile,
+              borderColor = borderColor,
+              panelBg = panelBg,
+              panelBgElevated = panelBgElevated,
+              textPrimary = textPrimary,
+              textSecondary = textSecondary,
+              textMuted = textMuted,
+              isLight = isLight,
+              onQuerySubmit = onQuerySubmit,
+              onQueryChange = onQueryChange,
+              onOpenSettings = onOpenSettings,
+              onRequestPermission = onRequestPermission,
+              onToggleVoice = onToggleVoice,
+              onConfirmOption = onConfirmOption,
+              onToggleAppDrawer = onToggleAppDrawer,
+              onToggleMediaPlayback = onToggleMediaPlayback,
+              onNextMediaTrack = onNextMediaTrack,
+              onPreviousMediaTrack = onPreviousMediaTrack,
+              keyboardController = keyboardController
+            )
+          }
+          AdaptiveLayoutMode.PHONE_PORTRAIT -> {
+            PhonePortraitHomeScreen(
+              uiState = uiState,
+              deviceProfile = deviceProfile,
+              borderColor = borderColor,
+              panelBg = panelBg,
+              panelBgElevated = panelBgElevated,
+              textPrimary = textPrimary,
+              textSecondary = textSecondary,
+              textMuted = textMuted,
+              isLight = isLight,
+              onQuerySubmit = onQuerySubmit,
+              onQueryChange = onQueryChange,
+              onOpenSettings = onOpenSettings,
+              onRequestPermission = onRequestPermission,
+              onToggleVoice = onToggleVoice,
+              onConfirmOption = onConfirmOption,
+              onToggleAppDrawer = onToggleAppDrawer,
+              onToggleMediaPlayback = onToggleMediaPlayback,
+              onNextMediaTrack = onNextMediaTrack,
+              onPreviousMediaTrack = onPreviousMediaTrack,
+              keyboardController = keyboardController
+            )
+          }
+        }
       }
     }
 

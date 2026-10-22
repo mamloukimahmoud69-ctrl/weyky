@@ -56,6 +56,9 @@ import com.example.core.voice.model.VoiceModelType
 import com.example.ui.theme.JarvisHudBadge
 import com.example.ui.theme.JarvisHudCard
 import com.example.ui.theme.JarvisHudColors
+import com.example.ui.theme.MinimalBackgroundConfig
+import com.example.ui.theme.ThemeSelectorSection
+import com.example.ui.theme.WeykyThemeMode
 import java.io.File
 import java.util.Locale
 
@@ -129,8 +132,25 @@ fun AppearanceSettingsContent(
   onSetLightMode: (Boolean) -> Unit,
   onUpdateBackgroundColor: (Long) -> Unit,
   onUpdateCardBorderColor: (Long) -> Unit,
+  onSelectTheme: (WeykyThemeMode) -> Unit = {},
+  onUpdateMinimalConfig: (MinimalBackgroundConfig) -> Unit = {},
+  onResetAllDefaults: () -> Unit = {},
   isGrouped: Boolean = false
 ) {
+  val themeSelectionContent = @Composable {
+    ThemeSelectorSection(
+      currentMode = uiState.themeMode,
+      minimalConfig = uiState.minimalBackgroundConfig,
+      borderColor = borderColor,
+      textPrimary = textPrimary,
+      textSecondary = textSecondary,
+      panelBg = panelBg,
+      onSelectTheme = onSelectTheme,
+      onUpdateMinimalConfig = onUpdateMinimalConfig,
+      onResetAllDefaults = onResetAllDefaults
+    )
+  }
+
   val coreScaleContent = @Composable {
     Text(
       text = "حجم النواة في الشاشة: ${(uiState.coreScale * 100).toInt()}%",
@@ -376,6 +396,15 @@ fun AppearanceSettingsContent(
 
   if (isGrouped) {
     SettingsSubSection(
+      title = "نظام المظهر والأنماط (Themes)",
+      subtitle = "التبديل الفوري بين التكتيكي (Tactical)، العصري (Modern)، والبسيط (Minimal)",
+      accentColor = borderColor,
+      containerColor = JarvisHudColors.panelBgElevated(isLight),
+      textPrimary = textPrimary,
+      textSecondary = textSecondary,
+      content = themeSelectionContent
+    )
+    SettingsSubSection(
       title = "أبعاد وعرض النواة",
       subtitle = "تحكم في نسبة استيعاب الدائرة الحية على شاشة الهاتف",
       accentColor = borderColor,
@@ -385,29 +414,35 @@ fun AppearanceSettingsContent(
       content = coreScaleContent
     )
     SettingsSubSection(
-      title = "نمط المظهر العام",
-      subtitle = "التبديل الفوري بين الوضع الليلي والوضع النهاري التكتيكي",
+      title = "الوضع النهاري والليلي",
+      subtitle = "التبديل الفوري بين الوضع الليلي والوضع النهاري",
       accentColor = borderColor,
       containerColor = JarvisHudColors.panelBgElevated(isLight),
       textPrimary = textPrimary,
       textSecondary = textSecondary,
       content = themeModeContent
     )
-    SettingsSubSection(
-      title = "تخصيص الألوان التكتيكية",
-      subtitle = "اختيار باليتات ألوان الخلفية والإطارات المضيئة",
-      accentColor = borderColor,
-      containerColor = JarvisHudColors.panelBgElevated(isLight),
-      textPrimary = textPrimary,
-      textSecondary = textSecondary,
-      content = colorsContent
-    )
+    if (uiState.themeMode == WeykyThemeMode.TACTICAL) {
+      SettingsSubSection(
+        title = "تخصيص الألوان التكتيكية (HUD)",
+        subtitle = "اختيار باليتات ألوان الخلفية والإطارات المضيئة",
+        accentColor = borderColor,
+        containerColor = JarvisHudColors.panelBgElevated(isLight),
+        textPrimary = textPrimary,
+        textSecondary = textSecondary,
+        content = colorsContent
+      )
+    }
   } else {
+    themeSelectionContent()
+    Spacer(modifier = Modifier.height(16.dp))
     coreScaleContent()
-    Spacer(modifier = Modifier.height(12.dp))
-    themeModeContent()
     Spacer(modifier = Modifier.height(14.dp))
-    colorsContent()
+    themeModeContent()
+    if (uiState.themeMode == WeykyThemeMode.TACTICAL) {
+      Spacer(modifier = Modifier.height(14.dp))
+      colorsContent()
+    }
   }
 }
 

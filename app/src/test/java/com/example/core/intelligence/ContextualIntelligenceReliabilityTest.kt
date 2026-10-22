@@ -416,7 +416,7 @@ class ContextualIntelligenceReliabilityTest {
     )
 
     // Direct response on unindexed topic uses conversational reasoner
-    val res = conversationalEngine.respond("ما هي عاصمة مدغشقر القديمة؟")
+    val res = conversationalEngine.respond("ما هي نظرية الأوتار الفائقة بأبعادها الإحدى عشرة؟")
     assertNotNull(res.replyText)
     assertTrue(res.replyText.contains("غير مسجلة في قاعدة المعرفة المحلية"))
   }
