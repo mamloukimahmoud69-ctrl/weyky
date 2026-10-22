@@ -13,11 +13,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
+
+val LocalWeykyThemeMode = staticCompositionLocalOf { WeykyThemeMode.TACTICAL }
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -220,94 +225,227 @@ fun JarvisHudCard(
   tabTitle: String? = null,
   tabPosition: HudTabPosition = if (tabTitle != null) HudTabPosition.TOP_START else HudTabPosition.NONE,
   onClick: (() -> Unit)? = null,
+  themeMode: WeykyThemeMode = LocalWeykyThemeMode.current,
   content: @Composable BoxScope.() -> Unit
 ) {
-  val shape = CutCornerShape(cutCornerSize)
   val clickMod = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
   val isLightCard = (containerColor.red + containerColor.green + containerColor.blue) / 3f > 0.5f
-  val midGradientColor = if (isLightCard) Color(0xFFF7FAFD) else Color(0xEE02070E)
 
-  Column(modifier = modifier) {
-    // Optional Top-Start Trapezoidal HUD Tab (e.g., "• CONTEXT" or "• WEYKY")
-    if (tabTitle != null && tabPosition == HudTabPosition.TOP_START) {
-      HudTrapezoidTab(
-        title = tabTitle,
-        accentColor = accentColor,
-        containerColor = containerColor,
-        isLightCard = isLightCard,
-        isTop = true,
-        modifier = Modifier.padding(start = cutCornerSize)
-      )
+  when (themeMode) {
+    WeykyThemeMode.TACTICAL -> {
+      val shape = CutCornerShape(cutCornerSize)
+      val midGradientColor = if (isLightCard) Color(0xFFF7FAFD) else Color(0xEE02070E)
+
+      Column(modifier = modifier) {
+        if (tabTitle != null && tabPosition == HudTabPosition.TOP_START) {
+          HudTrapezoidTab(
+            title = tabTitle,
+            accentColor = accentColor,
+            containerColor = containerColor,
+            isLightCard = isLightCard,
+            isTop = true,
+            modifier = Modifier.padding(start = cutCornerSize)
+          )
+        }
+
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+              Brush.verticalGradient(
+                colors = listOf(
+                  containerColor,
+                  midGradientColor,
+                  containerColor
+                )
+              )
+            )
+            .then(clickMod)
+            .drawWithContent {
+              if (showScanlines) {
+                val gridStep = 14.dp.toPx()
+                val gridColor = accentColor.copy(alpha = if (isLightCard) 0.08f else 0.045f)
+                var gx = gridStep
+                while (gx < size.width) {
+                  drawLine(
+                    color = gridColor,
+                    start = Offset(gx, 0f),
+                    end = Offset(gx, size.height),
+                    strokeWidth = 0.8f
+                  )
+                  gx += gridStep
+                }
+                var gy = gridStep
+                while (gy < size.height) {
+                  drawLine(
+                    color = gridColor,
+                    start = Offset(0f, gy),
+                    end = Offset(size.width, gy),
+                    strokeWidth = 0.8f
+                  )
+                  gy += gridStep
+                }
+              }
+
+              drawContent()
+
+              drawOctagonalDoubleFrame(
+                accentColor = accentColor,
+                cutPx = cutCornerSize.toPx()
+              )
+            },
+          content = content
+        )
+
+        if (tabTitle != null && tabPosition == HudTabPosition.BOTTOM_END) {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(end = cutCornerSize),
+            contentAlignment = Alignment.CenterEnd
+          ) {
+            HudTrapezoidTab(
+              title = tabTitle,
+              accentColor = accentColor,
+              containerColor = containerColor,
+              isLightCard = isLightCard,
+              isTop = false
+            )
+          }
+        }
+      }
     }
 
-    // Main Octagonal Double-Border Card Body
-    Box(
-      modifier = Modifier
-        .fillMaxWidth()
-        .clip(shape)
-        .background(
-          Brush.verticalGradient(
-            colors = listOf(
-              containerColor,
-              midGradientColor,
-              containerColor
+    WeykyThemeMode.MODERN -> {
+      val modernShape = RoundedCornerShape((cutCornerSize + 2.dp).coerceAtLeast(16.dp))
+      val modernGlassBg = if (isLightCard) Color(0xEEF8FAFC) else Color(0xCC081326)
+
+      Column(modifier = modifier) {
+        if (tabTitle != null && tabPosition == HudTabPosition.TOP_START) {
+          Row(
+            modifier = Modifier.padding(start = 14.dp, bottom = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+          ) {
+            Box(
+              modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(accentColor)
             )
-          )
-        )
-        .then(clickMod)
-        .drawWithContent {
-          // 1. Subtle internal blueprint grid inside the card (matches weyky.jpg)
-          if (showScanlines) {
-            val gridStep = 14.dp.toPx()
-            val gridColor = accentColor.copy(alpha = if (isLightCard) 0.08f else 0.045f)
-            var gx = gridStep
-            while (gx < size.width) {
-              drawLine(
-                color = gridColor,
-                start = Offset(gx, 0f),
-                end = Offset(gx, size.height),
-                strokeWidth = 0.8f
-              )
-              gx += gridStep
-            }
-            var gy = gridStep
-            while (gy < size.height) {
-              drawLine(
-                color = gridColor,
-                start = Offset(0f, gy),
-                end = Offset(size.width, gy),
-                strokeWidth = 0.8f
-              )
-              gy += gridStep
-            }
+            Text(
+              text = tabTitle.removePrefix("•").trim(),
+              fontSize = 10.sp,
+              fontWeight = FontWeight.Bold,
+              color = accentColor,
+              letterSpacing = 0.8.sp
+            )
           }
+        }
 
-          drawContent()
-
-          // 2. Double-layer octagonal border + corner chevrons
-          drawOctagonalDoubleFrame(
-            accentColor = accentColor,
-            cutPx = cutCornerSize.toPx()
-          )
-        },
-      content = content
-    )
-
-    // Optional Bottom-End Trapezoidal HUD Tab (e.g., "• EVENTS")
-    if (tabTitle != null && tabPosition == HudTabPosition.BOTTOM_END) {
-      Box(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(end = cutCornerSize),
-        contentAlignment = Alignment.CenterEnd
-      ) {
-        HudTrapezoidTab(
-          title = tabTitle,
-          accentColor = accentColor,
-          containerColor = containerColor,
-          isLightCard = isLightCard,
-          isTop = false
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(modernShape)
+            .background(modernGlassBg)
+            .border(
+              width = 1.2.dp,
+              brush = Brush.verticalGradient(
+                colors = listOf(
+                  accentColor.copy(alpha = 0.6f),
+                  accentColor.copy(alpha = 0.2f),
+                  accentColor.copy(alpha = 0.5f)
+                )
+              ),
+              shape = modernShape
+            )
+            .then(clickMod)
+            .drawWithContent {
+              drawContent()
+              drawLine(
+                brush = Brush.horizontalGradient(
+                  colors = listOf(
+                    Color.Transparent,
+                    Color.White.copy(alpha = 0.35f),
+                    accentColor.copy(alpha = 0.5f),
+                    Color.White.copy(alpha = 0.35f),
+                    Color.Transparent
+                  )
+                ),
+                start = Offset(size.width * 0.15f, 1.dp.toPx()),
+                end = Offset(size.width * 0.85f, 1.dp.toPx()),
+                strokeWidth = 1.4.dp.toPx()
+              )
+            },
+          content = content
         )
+
+        if (tabTitle != null && tabPosition == HudTabPosition.BOTTOM_END) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(end = 14.dp, top = 5.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Text(
+              text = tabTitle.removePrefix("•").trim(),
+              fontSize = 10.sp,
+              fontWeight = FontWeight.Bold,
+              color = accentColor,
+              letterSpacing = 0.8.sp
+            )
+          }
+        }
+      }
+    }
+
+    WeykyThemeMode.MINIMAL -> {
+      val minimalShape = RoundedCornerShape((cutCornerSize - 2.dp).coerceAtLeast(10.dp))
+      val minimalMatteBg = if (isLightCard) Color(0xFFF1F5F9) else Color(0xF20F172A)
+      val minimalBorder = if (isLightCard) Color(0xFFCBD5E1) else Color(0x3364748B)
+
+      Column(modifier = modifier) {
+        if (tabTitle != null && tabPosition == HudTabPosition.TOP_START) {
+          Text(
+            text = tabTitle.removePrefix("•").trim(),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF94A3B8),
+            modifier = Modifier.padding(start = 10.dp, bottom = 4.dp)
+          )
+        }
+
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(minimalShape)
+            .background(minimalMatteBg)
+            .border(
+              width = 1.dp,
+              color = minimalBorder,
+              shape = minimalShape
+            )
+            .then(clickMod),
+          content = content
+        )
+
+        if (tabTitle != null && tabPosition == HudTabPosition.BOTTOM_END) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(end = 10.dp, top = 4.dp),
+            horizontalArrangement = Arrangement.End
+          ) {
+            Text(
+              text = tabTitle.removePrefix("•").trim(),
+              fontSize = 10.sp,
+              fontWeight = FontWeight.SemiBold,
+              color = Color(0xFF94A3B8)
+            )
+          }
+        }
       }
     }
   }
@@ -411,27 +549,64 @@ fun JarvisHudBadge(
   containerColor: Color = Color(0xD9040E1A),
   cutSize: Dp = 7.dp,
   onClick: (() -> Unit)? = null,
+  themeMode: WeykyThemeMode = LocalWeykyThemeMode.current,
   content: @Composable BoxScope.() -> Unit
 ) {
-  val shape = CutCornerShape(cutSize)
   val clickMod = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
 
-  Box(
-    modifier = modifier
-      .clip(shape)
-      .background(containerColor)
-      .then(clickMod)
-      .drawWithContent {
-        drawContent()
-        drawOctagonalDoubleFrame(
-          accentColor = accentColor,
-          cutPx = cutSize.toPx(),
-          drawInnerFrame = false,
-          outerStroke = 1.4f
-        )
-      },
-    content = content
-  )
+  when (themeMode) {
+    WeykyThemeMode.TACTICAL -> {
+      val shape = CutCornerShape(cutSize)
+      Box(
+        modifier = modifier
+          .clip(shape)
+          .background(containerColor)
+          .then(clickMod)
+          .drawWithContent {
+            drawContent()
+            drawOctagonalDoubleFrame(
+              accentColor = accentColor,
+              cutPx = cutSize.toPx(),
+              drawInnerFrame = false,
+              outerStroke = 1.4f
+            )
+          },
+        content = content
+      )
+    }
+    WeykyThemeMode.MODERN -> {
+      val modernBadgeShape = RoundedCornerShape(12.dp)
+      Box(
+        modifier = modifier
+          .clip(modernBadgeShape)
+          .background(Color(0xCC091326))
+          .border(
+            width = 1.2.dp,
+            brush = Brush.verticalGradient(
+              listOf(accentColor.copy(alpha = 0.65f), accentColor.copy(alpha = 0.3f))
+            ),
+            shape = modernBadgeShape
+          )
+          .then(clickMod),
+        content = content
+      )
+    }
+    WeykyThemeMode.MINIMAL -> {
+      val minimalBadgeShape = RoundedCornerShape(8.dp)
+      Box(
+        modifier = modifier
+          .clip(minimalBadgeShape)
+          .background(Color(0xF01E293B))
+          .border(
+            width = 1.dp,
+            color = Color(0x3364748B),
+            shape = minimalBadgeShape
+          )
+          .then(clickMod),
+        content = content
+      )
+    }
+  }
 }
 
 /**

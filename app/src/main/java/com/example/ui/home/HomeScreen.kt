@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +37,7 @@ import com.example.ui.adaptive.DevicePosture
 import com.example.ui.adaptive.DeviceProfile
 import com.example.ui.adaptive.rememberAdaptiveLayoutState
 import com.example.ui.theme.JarvisHudColors
+import com.example.ui.theme.LocalWeykyThemeMode
 import com.example.ui.theme.MinimalBackgroundContainer
 import com.example.ui.theme.WeykyThemeMode
 import com.example.ui.theme.jarvisTacticalBackground
@@ -61,17 +63,51 @@ fun HomeScreen(
   val keyboardController = LocalSoftwareKeyboardController.current
   val isLight = uiState.isLightMode
   val bgColor = Color(uiState.backgroundColorHex)
-  val borderColor = Color(uiState.cardBorderColorHex)
-  val panelBg = JarvisHudColors.panelBg(isLight)
-  val panelBgElevated = JarvisHudColors.panelBgElevated(isLight)
-  val textPrimary = JarvisHudColors.textPrimary(isLight)
-  val textSecondary = JarvisHudColors.textSecondary(isLight)
-  val textMuted = JarvisHudColors.textMuted(isLight)
+
+  // Resolve theme-specific colors
+  val (activeBorderColor, activePanelBg, activePanelBgElevated, activeTextPrimary) = when (uiState.themeMode) {
+    WeykyThemeMode.TACTICAL -> {
+      listOf(
+        Color(uiState.cardBorderColorHex),
+        panelBg,
+        panelBgElevated,
+        textPrimary
+      )
+    }
+    WeykyThemeMode.MODERN -> {
+      listOf(
+        Color(0xFF00F0FF),
+        if (isLight) Color(0xEEF8FAFC) else Color(0xCC081326),
+        if (isLight) Color(0xFFFFFFFF) else Color(0xE60D1E38),
+        if (isLight) Color(0xFF0F172A) else Color(0xFFF8FAFC)
+      )
+    }
+    WeykyThemeMode.MINIMAL -> {
+      listOf(
+        if (isLight) Color(0xFF94A3B8) else Color(0xFF475569),
+        if (isLight) Color(0xFFF1F5F9) else Color(0xF20F172A),
+        if (isLight) Color(0xFFFFFFFF) else Color(0xF21E293B),
+        if (isLight) Color(0xFF0F172A) else Color(0xFFF1F5F9)
+      )
+    }
+  }
+
+  val activeTextSecondary = if (uiState.themeMode == WeykyThemeMode.MODERN || uiState.themeMode == WeykyThemeMode.MINIMAL) {
+    Color(0xFF94A3B8)
+  } else {
+    textSecondary
+  }
+
+  val activeTextMuted = if (uiState.themeMode == WeykyThemeMode.MODERN || uiState.themeMode == WeykyThemeMode.MINIMAL) {
+    Color(0xFF64748B)
+  } else {
+    textMuted
+  }
 
   val themeModifier = when (uiState.themeMode) {
     WeykyThemeMode.TACTICAL -> Modifier.jarvisTacticalBackground(
       backgroundColor = bgColor,
-      accentColor = borderColor
+      accentColor = activeBorderColor
     )
     WeykyThemeMode.MODERN -> Modifier.modernCinematicBackground(
       visualState = uiState.visualState,
